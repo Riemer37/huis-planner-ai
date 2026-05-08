@@ -142,3 +142,52 @@ export async function callLovableAI(prompt: string): Promise<AiAnalysisShape> {
   if (!args) throw new Error("AI: geen structureel antwoord");
   return JSON.parse(args) as AiAnalysisShape;
 }
+
+export function cryptoRandomId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export function synthesizeWoz(marktwaarde: number) {
+  const base = Math.round(marktwaarde / 1.1);
+  const arr: { jaar: number; waarde: number }[] = [];
+  const cur = new Date().getFullYear();
+  for (let i = 4; i >= 0; i--) arr.push({ jaar: cur - i, waarde: Math.round(base * Math.pow(0.94, i)) });
+  return arr.reverse();
+}
+
+export function fallbackAI(pandtype: import("./types").PandType): AiAnalysisShape {
+  return {
+    investeringsthese: "AI-analyse niet beschikbaar. Handmatige beoordeling vereist.",
+    advies: "Voorwaardelijk",
+    score: 5,
+    risico: { locatie: 5, staat: 5, markt: 5, liquiditeit: 5 },
+    marktwaarde_ai: 350000,
+    huurwaarde_ai: 1400,
+    transformatieadvies: "—",
+    marktcontext: "—",
+    pandtype_bevestiging: pandtype,
+    commercieel_huurprijs_pm2: pandtype === "commercieel" ? 150 : null,
+    opmerkingen: ["AI-analyse mislukt — controleer Lovable AI credits."],
+  };
+}
+
+export function buildPrompt(ctx: any) {
+  return `Analyseer dit pand voor een Nederlandse vastgoedbelegger en roep de tool 'analyse_pand' aan.
+
+Invoer: ${ctx.query}
+Soort invoer: ${ctx.isUrl ? "URL (Funda/Pararius/Vendr)" : "Adres"}
+Pandtype (door gebruiker geselecteerd): ${ctx.pandtype}
+
+PDOK locatie: ${JSON.stringify(ctx.pdok ?? "onbekend")}
+BAG verblijfsobject: ${JSON.stringify(ctx.bag ?? "onbekend")}
+Monument/beschermd gezicht: ${JSON.stringify(ctx.monument)}
+
+Instructies:
+- score 1-10 (10 = uitstekende belegging).
+- risico velden 1-10 (10 = hoog risico).
+- marktwaarde_ai en huurwaarde_ai in euro (huurwaarde per maand voor woning, of leeg voor commercieel).
+- Voor commercieel: vul bar_bruto, nar_netto, leegstandsrisico, huurprijszone, commercieel_huurprijs_pm2 (€/m²/jr).
+- Voor nieuwbouw: vermeld dat WOZ niet beschikbaar is.
+- Geef 2-5 opmerkingen (erfpacht, monument, splitsing, OVB-tarief, BTW, etc.).
+- Investeringsthese max 200 woorden, Nederlands.`;
+}
