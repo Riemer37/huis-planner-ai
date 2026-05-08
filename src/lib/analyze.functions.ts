@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { callLovableAI, fetchBagVbo, fetchPdok, fetchRijksmonument } from "./analyze.server";
+import { buildPrompt, callLovableAI, cryptoRandomId, fallbackAI, fetchBagVbo, fetchPdok, fetchRijksmonument, synthesizeWoz } from "./analyze.server";
 import type { PropertyAnalysis, PandType } from "./types";
 
 const InputSchema = z.object({
