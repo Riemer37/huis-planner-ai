@@ -121,13 +121,13 @@ function EmptyState({ error, loading, onAnalyze }: { error: string | null; loadi
       {/* Hero background */}
       <img
         src={heroImage}
-        alt="Modern luxury architectural property at golden hour"
+        alt="Klassieke Amsterdamse grachtenpanden tijdens het gouden uur"
         width={1920}
         height={1080}
         className="absolute inset-0 w-full h-full object-cover"
       />
       {/* Light overlay */}
-      <div className="absolute inset-0 bg-white/45" />
+      <div className="absolute inset-0 bg-white/40" />
       <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-white/60" />
 
       {/* Centered card */}
