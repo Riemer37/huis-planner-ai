@@ -122,6 +122,48 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (primary) bronnen.push("Lovable AI");
     if (secondary) bronnen.push("Anthropic");
 
+    // Energielabel-conflict detectie (Funda primair, EP-online verificatie)
+    const fundaLabel = listing?.energielabel?.toUpperCase().trim();
+    const epLabel = energie?.label?.toUpperCase().trim();
+    let energielabel: PropertyAnalysis["energielabel"];
+    if (fundaLabel && epLabel) {
+      const conflict = fundaLabel !== epLabel;
+      energielabel = {
+        label: fundaLabel,
+        bron: "Funda listing",
+        label_secondary: epLabel,
+        bron_secondary: "EP-online",
+        conflict,
+      };
+    } else if (fundaLabel) {
+      energielabel = { label: fundaLabel, bron: "Funda listing" };
+    } else if (epLabel) {
+      energielabel = { label: epLabel, bron: "EP-online" };
+    } else {
+      energielabel = { label: primary.pandtype_bevestiging === "nieuwbouw" ? "A" : "C", bron: "AI-schatting" };
+    }
+
+    // Apartment-detectie — perceel hoort dan niet bij de unit
+    const txt = `${listing?.beschrijving ?? ""} ${listing?.adres ?? ""} ${pdok?.adres ?? ""}`;
+    const aptKeywords = /(appartement|bovenwoning|benedenwoning|portiek|maisonnette|galerij|etage|flat)/i;
+    const gd = (bag?.gebruiksdoel ?? "").toLowerCase();
+    const isApt =
+      data.pandtype !== "commercieel" &&
+      (((bag as any)?.vbos ?? 0) > 1 ||
+        aptKeywords.test(txt) ||
+        (gd.includes("woonfunctie") && (bag?.oppervlakte ?? 999) < 110 && !listing?.m2));
+
+    // Databronnen-overzicht
+    const databronnen: { naam: string; data: string; status: "ok" | "fail" | "estimate" }[] = [
+      { naam: "PDOK Locatieserver", data: pdok?.adres ?? "—", status: pdok ? "ok" : "fail" },
+      { naam: "BAG (Kadaster)", data: bag?.oppervlakte ? `${bag.oppervlakte} m² · ${bag.gebruiksdoel ?? "—"}` : "—", status: bag ? "ok" : "fail" },
+      { naam: "EP-online energielabel", data: epLabel ?? "—", status: epLabel ? "ok" : "fail" },
+      { naam: "Funda listing", data: fundaLabel ? `Label ${fundaLabel}` : (listing?.bron === "scraperapi" ? "Geen label" : "—"), status: listing?.bron === "scraperapi" ? "ok" : (isUrl ? "fail" : "estimate") },
+      { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
+      { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
+      { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
+    ];
+
     const result: PropertyAnalysis = {
       id: cryptoRandomId(),
       timestamp: Date.now(),
@@ -139,10 +181,10 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       woz: altum?.woz_geschat
         ? synthesizeWoz(altum.woz_geschat * 1.1)
         : synthesizeWoz(primary.marktwaarde_ai),
-      energielabel: energie
-        ? { label: energie.label, bron: energie.bron }
-        : { label: primary.pandtype_bevestiging === "nieuwbouw" ? "A" : "C", bron: "schatting" },
-      perceel_m2: data.pandtype === "commercieel" ? undefined : 120,
+      energielabel,
+      is_apartment: isApt,
+      perceel_m2: data.pandtype === "commercieel" || isApt ? undefined : 120,
+      databronnen,
     };
     return result;
   });
