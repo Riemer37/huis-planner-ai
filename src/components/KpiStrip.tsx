@@ -30,7 +30,7 @@ function Tile({
 
 export function KpiStrip({ a }: { a: PropertyAnalysis }) {
   const reno = berekenRenovatiekosten(a);
-  const maxBod = berekenMaxBod(a, 5, reno.totaal, a.pandtype === "woning");
+  const maxBod = berekenMaxBod(a, 10, reno.totaal, a.pandtype === "woning");
   const vraag = a.listing?.prijs;
   const marge = maxBod - (vraag ?? a.ai.marktwaarde_ai);
   const margePct = ((marge) / Math.max(1, vraag ?? a.ai.marktwaarde_ai)) * 100;
