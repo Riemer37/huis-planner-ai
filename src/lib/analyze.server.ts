@@ -466,6 +466,7 @@ function parseListingHtml(html: string, url: string): Listing {
     m2,
     kamers,
     bouwjaar,
+    perceel_m2: rxPlotVal ? Number(rxPlotVal) : undefined,
     energielabel: label,
     adres,
     beschrijving,
