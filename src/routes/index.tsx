@@ -12,11 +12,13 @@ import { PurchaseTab } from "@/components/tabs/PurchaseTab";
 import { RenovationTab } from "@/components/tabs/RenovationTab";
 import { ExitTab } from "@/components/tabs/ExitTab";
 import { ManualOverridePanel } from "@/components/ManualOverridePanel";
+import { PrefillForm } from "@/components/PrefillForm";
 
 import { analyzeProperty } from "@/lib/analyze.functions";
+import { prefetchProperty } from "@/lib/prefetch.functions";
 import { applyManualOverrides } from "@/lib/overrides";
 import { findCached, saveAnalysis } from "@/lib/storage";
-import type { ManualOverrides, PandType, PropertyAnalysis } from "@/lib/types";
+import type { ManualOverrides, PandType, PrefillResult, PropertyAnalysis } from "@/lib/types";
 import heroImage from "@/assets/hero-architecture.jpg";
 import { Search, Loader2 } from "lucide-react";
 
