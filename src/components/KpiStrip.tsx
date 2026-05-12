@@ -17,12 +17,12 @@ function Tile({
   icon: LucideIcon;
 }) {
   return (
-    <div className="panel gold-top lift p-4 relative">
+    <div className="panel navy-top lift p-4 relative">
       <div className="flex items-center justify-between mb-2">
         <span className="label-eyebrow">{label}</span>
-        <Icon className="size-3.5 text-muted-foreground/70" />
+        <Icon className="size-3.5 text-gold" />
       </div>
-      <div className={`text-xl font-bold tabular display ${color ?? "text-foreground"}`}>{value}</div>
+      <div className={`text-xl font-bold tabular display ${color ?? "text-navy"}`}>{value}</div>
       {sub && <div className="text-[11px] text-muted-foreground tabular mt-1">{sub}</div>}
     </div>
   );
@@ -39,10 +39,10 @@ export function KpiStrip({ a }: { a: PropertyAnalysis }) {
   const margeColor = marge >= 0 ? "text-positive" : "text-destructive";
 
   return (
-    <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 border-b border-border">
+    <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 border-b border-border bg-background">
       <Tile icon={Home} label="Vraagprijs" value={vraag ? fmtEUR(vraag) : "—"} sub={vraag ? undefined : "Geen listing"} />
-      <Tile icon={TrendingUp} label="Marktwaarde AI" value={fmtEUR(a.ai.marktwaarde_ai)} sub="AI-schatting" color="text-gold" />
-      <Tile icon={Hammer} label="Max. bod 5% ROI" value={fmtEUR(maxBod)} color="text-gold" />
+      <Tile icon={TrendingUp} label="Marktwaarde AI" value={fmtEUR(a.ai.marktwaarde_ai)} sub="AI-schatting" />
+      <Tile icon={Hammer} label="Max. bod 5% ROI" value={fmtEUR(maxBod)} />
       <Tile
         icon={Key}
         label={a.pandtype === "commercieel" ? "Markthuur €/m²/jr" : "Markthuur p.m."}
