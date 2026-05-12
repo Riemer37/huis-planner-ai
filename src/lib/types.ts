@@ -26,6 +26,17 @@ export interface FundaDebug {
   html_length: number;
   next_data_found: boolean;
   blocked: boolean;
+  scraperapi_debug_output?: string[];
+  scraperapi_attempts?: Array<{
+    scraper_url: string;
+    response_status?: number;
+    html_length: number;
+    contains_next_data: boolean;
+    first_500_chars: string;
+    account_status_header?: string | null;
+    credits_remaining?: string | null;
+    error?: string;
+  }>;
   raw_next_data?: JsonValue;
   raw_energy_label?: string;
   energy_label_field_path?: string;
