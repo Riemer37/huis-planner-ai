@@ -230,6 +230,8 @@ function parseListingHtml(html: string, url: string) {
       ?? html.match(/Energielabel[\s\S]{0,200}?>\s*([A-G]\+{0,4})\s*</i);
     if (dt) {
       label = normalizeLabel(dt[1]);
+      rawEnergyLabel = rawEnergyLabel ?? dt[1];
+      fieldPath = fieldPath ?? "html.Energielabel";
       labelSource = "funda_html";
       console.log("[FUNDA] HTML-fallback energielabel:", label);
     }
@@ -239,6 +241,9 @@ function parseListingHtml(html: string, url: string) {
   m2 = m2 ?? num(pick(/(\d{2,4})\s*m²/));
   bouwjaar = bouwjaar ?? num(pick(/Bouwjaar[^<]*<[^>]*>\s*(\d{4})/i)) ?? num(pick(/(\d{4})\s*<\/[^>]+>\s*<[^>]+>\s*Bouwjaar/i));
 
+  console.log("Energy label raw value:", rawEnergyLabel ?? null);
+  console.log("Energy label field path used:", fieldPath ?? null);
+  console.log("Final energy label returned:", label ?? null);
   console.log(`[FUNDA] FINAL energielabel="${label ?? "(none)"}" source=${labelSource} url=${url}`);
 
   return {
@@ -252,6 +257,23 @@ function parseListingHtml(html: string, url: string) {
     adres,
     beschrijving,
     bron: "scraperapi" as const,
+    funda_debug: {
+      html_length: htmlLength,
+      next_data_found: nextDataFound,
+      blocked,
+      raw_next_data: rawNextData,
+      raw_energy_label: rawEnergyLabel,
+      energy_label_field_path: fieldPath,
+      final_energy_label: label,
+      logs: [
+        `Raw HTML length: ${htmlLength}`,
+        `NEXT_DATA found: ${nextDataFound}`,
+        `Energy label raw value: ${rawEnergyLabel ?? "null"}`,
+        `Energy label field path used: ${fieldPath ?? "null"}`,
+        `Final energy label returned: ${label ?? "null"}`,
+        ...(blocked ? ["FUNDA BLOCKED — real page not returned"] : []),
+      ],
+    },
   };
 }
 
