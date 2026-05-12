@@ -21,7 +21,7 @@ const scoreRing = (score: number) => {
 
 function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-card/60 text-[11px] font-medium text-foreground/85">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-muted text-[11px] font-medium text-foreground">
       {children}
     </span>
   );
