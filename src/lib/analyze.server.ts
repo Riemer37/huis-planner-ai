@@ -112,16 +112,44 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
 }
 
 // ---------- ScraperAPI — Funda / Pararius listing ----------
+async function fetchViaScraperApi(key: string, targetUrl: string): Promise<string | null> {
+  const encoded = encodeURIComponent(targetUrl);
+  const api = `http://api.scraperapi.com/?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
+  const r = await fetch(api, {
+    headers: {
+      "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
+      "X-MyHeader-Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "X-MyHeader-User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    },
+  });
+  if (!r.ok) {
+    console.log(`[SCRAPERAPI] HTTP ${r.status} for ${targetUrl}`);
+    return null;
+  }
+  return await r.text();
+}
+
 export async function scrapeListing(targetUrl: string) {
   const key = process.env.SCRAPER_API_KEY;
   if (!key) return null;
   try {
-    const api = `http://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&country_code=nl&render=false`;
-    const r = await fetch(api);
-    if (!r.ok) return null;
-    const html = await r.text();
-    return parseListingHtml(html, targetUrl);
-  } catch {
+    let html = await fetchViaScraperApi(key, targetUrl);
+    let attempts = 1;
+    const isBlocked = (h: string | null) => !h || h.length < 100000 || !h.includes("__NEXT_DATA__");
+    if (isBlocked(html)) {
+      console.log(`[SCRAPERAPI] Attempt 1 blocked (len=${html?.length ?? 0}). Retrying once.`);
+      html = await fetchViaScraperApi(key, targetUrl);
+      attempts = 2;
+    }
+    if (!html) return null;
+    const parsed = parseListingHtml(html, targetUrl);
+    if (parsed?.funda_debug) {
+      (parsed.funda_debug as any).attempts = attempts;
+    }
+    return parsed;
+  } catch (e) {
+    console.log("[SCRAPERAPI] error:", (e as Error).message);
     return null;
   }
 }
