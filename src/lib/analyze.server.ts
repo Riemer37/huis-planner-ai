@@ -205,7 +205,7 @@ function parseListingHtml(html: string, url: string) {
   const htmlLength = html.length;
   const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
   const nextDataFound = !!nextData;
-  const blocked = htmlLength < 50000 || !nextDataFound;
+  const blocked = htmlLength < 100000 || !nextDataFound;
 
   console.log("Raw HTML length:", htmlLength);
   console.log("NEXT_DATA found:", nextDataFound);
