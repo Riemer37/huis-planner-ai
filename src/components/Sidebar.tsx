@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Search, Trash2, Building2 } from "lucide-react";
+import { Loader2, Search, Trash2, Building, History } from "lucide-react";
 import type { PandType, PropertyAnalysis } from "@/lib/types";
 import { loadHistory, deleteAnalysis } from "@/lib/storage";
 import { fmtEUR } from "@/lib/calculations";
@@ -27,39 +27,46 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
   };
 
   return (
-    <aside className="w-80 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
-      <div className="p-5 border-b border-sidebar-border flex items-center gap-2">
-        <div className="size-8 rounded bg-primary flex items-center justify-center">
-          <Building2 className="size-4 text-primary-foreground" />
+    <aside className="w-[280px] shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0 border-r border-sidebar-border">
+      {/* Brand */}
+      <div className="px-5 py-5 border-b border-sidebar-border flex items-center gap-3">
+        <div className="size-9 rounded-md bg-gold-gradient flex items-center justify-center shadow-[var(--shadow-gold)]">
+          <Building className="size-5 text-primary-foreground" strokeWidth={2.4} />
         </div>
         <div>
-          <div className="font-semibold tracking-tight">VastgoedAI</div>
-          <div className="text-[11px] opacity-60">Beleggingsanalyse</div>
+          <div className="font-bold tracking-tight text-[15px] display">
+            Vastgoed<span className="text-gold">AI</span>
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-0.5">Investment Terminal</div>
         </div>
       </div>
 
+      {/* Search / analyse */}
       <div className="p-4 space-y-3 border-b border-sidebar-border">
-        <label className="block text-xs uppercase tracking-wide opacity-70">Funda-URL of adres</label>
-        <textarea
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="https://www.funda.nl/... of Damrak 1, Amsterdam"
-          rows={3}
-          className="w-full bg-sidebar-accent text-sidebar-foreground placeholder:opacity-40 rounded p-2 text-sm border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-primary"
-        />
+        <label className="label-eyebrow block">Funda-URL of adres</label>
+        <div className="relative group">
+          <Search className="size-4 absolute left-3 top-3 text-muted-foreground pointer-events-none" />
+          <textarea
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder="https://www.funda.nl/...  ·  Damrak 1, Amsterdam"
+            rows={3}
+            className="w-full bg-sidebar-accent text-sidebar-foreground placeholder:text-muted-foreground/60 rounded-md pl-9 pr-3 py-2.5 text-sm border border-sidebar-border resize-none transition"
+          />
+        </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wide opacity-70 mb-1">Pandtype</label>
+          <label className="label-eyebrow block mb-1.5">Pandtype</label>
           <select
             value={pandtype}
             onChange={(e) => setPandtype(e.target.value as PandType)}
-            className="w-full bg-sidebar-accent rounded p-2 text-sm border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full bg-sidebar-accent rounded-md px-2.5 py-2 text-sm border border-sidebar-border"
           >
             <option value="woning">Woning (bestaand)</option>
             <option value="nieuwbouw">Nieuwbouw</option>
@@ -71,58 +78,77 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
         <button
           onClick={submit}
           disabled={loading || !q.trim()}
-          className="w-full flex items-center justify-center gap-2 bg-primary hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground rounded py-2 text-sm font-medium transition"
+          className="w-full flex items-center justify-center gap-2 bg-gold-gradient disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground rounded-md py-2.5 text-sm font-bold tracking-wide transition shadow-[var(--shadow-gold)] hover:brightness-110 active:scale-[0.99]"
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {loading ? "Data ophalen…" : "Analyseer"}
         </button>
 
         {loading && loadingStages && loadingStages.length > 0 && (
-          <ul className="text-xs space-y-1 opacity-80">
+          <ul className="text-[11px] space-y-1 text-muted-foreground pt-1">
             {loadingStages.map((s, i) => (
-              <li key={i}>• {s}</li>
+              <li key={i} className="flex items-center gap-1.5">
+                <span className="size-1 rounded-full bg-primary animate-pulse" />
+                {s}
+              </li>
             ))}
           </ul>
         )}
       </div>
 
+      {/* History */}
       <div className="p-4 flex-1 overflow-y-auto">
-        <div className="text-xs uppercase tracking-wide opacity-70 mb-2">Geschiedenis</div>
-        {history.length === 0 && <div className="text-xs opacity-50">Nog geen analyses.</div>}
+        <div className="flex items-center gap-1.5 label-eyebrow mb-3">
+          <History className="size-3" /> Geschiedenis
+        </div>
+        {history.length === 0 && <div className="text-xs text-muted-foreground/70">Nog geen analyses.</div>}
         <ul className="space-y-1">
-          {history.map((h) => (
-            <li
-              key={h.id}
-              className={`group rounded p-2 text-xs cursor-pointer hover:bg-sidebar-accent ${current?.id === h.id ? "bg-sidebar-accent" : ""}`}
-              onClick={() => onSelectHistory(h)}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`size-2 rounded-full shrink-0 ${Date.now() - h.timestamp < 23 * 3600 * 1000 ? "bg-positive" : "bg-muted-foreground"}`} />
-                  <span className="truncate">{h.pdok?.adres ?? h.input}</span>
+          {history.map((h) => {
+            const active = current?.id === h.id;
+            const fresh = Date.now() - h.timestamp < 23 * 3600 * 1000;
+            return (
+              <li
+                key={h.id}
+                className={`group rounded-md p-2.5 text-xs cursor-pointer border transition ${
+                  active
+                    ? "bg-sidebar-accent border-primary/40 shadow-[inset_2px_0_0_var(--primary)]"
+                    : "border-transparent hover:bg-sidebar-accent hover:border-sidebar-border"
+                }`}
+                onClick={() => onSelectHistory(h)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`size-1.5 rounded-full shrink-0 ${fresh ? "bg-positive shadow-[0_0_8px_var(--positive)]" : "bg-muted-foreground/50"}`} />
+                    <span className="truncate font-medium text-sidebar-foreground">{h.pdok?.adres ?? h.input}</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteAnalysis(h.id);
+                      setHistory(loadHistory());
+                    }}
+                    className="opacity-0 group-hover:opacity-100 hover:text-destructive transition"
+                    aria-label="Verwijder"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteAnalysis(h.id);
-                    setHistory(loadHistory());
-                  }}
-                  className="opacity-0 group-hover:opacity-100 hover:text-destructive"
-                  aria-label="Verwijder"
-                >
-                  <Trash2 className="size-3" />
-                </button>
-              </div>
-              <div className="opacity-60 mt-0.5 tabular">
-                {h.pandtype} · {fmtEUR(h.ai.marktwaarde_ai)} · score {h.ai.score}/10
-              </div>
-            </li>
-          ))}
+                <div className="text-muted-foreground mt-1 tabular flex items-center gap-1.5">
+                  <span className="capitalize">{h.pandtype}</span>
+                  <span className="opacity-40">·</span>
+                  <span className="text-gold">{fmtEUR(h.ai.marktwaarde_ai)}</span>
+                  <span className="opacity-40">·</span>
+                  <span>{h.ai.score}/10</span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
 
-      <div className="p-3 text-[10px] opacity-50 border-t border-sidebar-border">
-        Cache 24u · max 30 entries · Lovable AI
+      <div className="px-4 py-3 text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 border-t border-sidebar-border flex items-center justify-between">
+        <span>Cache 24u</span>
+        <span className="text-gold/80">Lovable AI</span>
       </div>
     </aside>
   );

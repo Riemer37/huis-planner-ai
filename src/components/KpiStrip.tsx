@@ -1,12 +1,29 @@
+import type { LucideIcon } from "lucide-react";
+import { Home, TrendingUp, Hammer, Key, Shield, Percent } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
 import { fmtEUR, fmtPct, berekenMaxBod, berekenRenovatiekosten } from "@/lib/calculations";
 
-function Tile({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+function Tile({
+  label,
+  value,
+  sub,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  color?: string;
+  icon: LucideIcon;
+}) {
   return (
-    <div className="bg-card border rounded-lg p-3">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`text-lg font-semibold tabular ${color ?? ""}`}>{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground tabular mt-0.5">{sub}</div>}
+    <div className="panel gold-top lift p-4 relative">
+      <div className="flex items-center justify-between mb-2">
+        <span className="label-eyebrow">{label}</span>
+        <Icon className="size-3.5 text-muted-foreground/70" />
+      </div>
+      <div className={`text-xl font-bold tabular display ${color ?? "text-foreground"}`}>{value}</div>
+      {sub && <div className="text-[11px] text-muted-foreground tabular mt-1">{sub}</div>}
     </div>
   );
 }
@@ -22,16 +39,17 @@ export function KpiStrip({ a }: { a: PropertyAnalysis }) {
   const margeColor = marge >= 0 ? "text-positive" : "text-destructive";
 
   return (
-    <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-      <Tile label="Vraagprijs" value={vraag ? fmtEUR(vraag) : "Geen listing"} />
-      <Tile label="Marktwaarde (AI)" value={fmtEUR(a.ai.marktwaarde_ai)} sub="AI-schatting" />
-      <Tile label="Max. bod (5% ROI)" value={fmtEUR(maxBod)} />
+    <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 border-b border-border">
+      <Tile icon={Home} label="Vraagprijs" value={vraag ? fmtEUR(vraag) : "—"} sub={vraag ? undefined : "Geen listing"} />
+      <Tile icon={TrendingUp} label="Marktwaarde AI" value={fmtEUR(a.ai.marktwaarde_ai)} sub="AI-schatting" color="text-gold" />
+      <Tile icon={Hammer} label="Max. bod 5% ROI" value={fmtEUR(maxBod)} color="text-gold" />
       <Tile
+        icon={Key}
         label={a.pandtype === "commercieel" ? "Markthuur €/m²/jr" : "Markthuur p.m."}
         value={a.pandtype === "commercieel" ? fmtEUR(a.ai.commercieel_huurprijs_pm2 ?? 0) : fmtEUR(a.ai.huurwaarde_ai)}
       />
-      <Tile label="Risico" value={`${risico}/10`} color={risicoColor} />
-      <Tile label="Marge" value={fmtEUR(marge)} sub={fmtPct(margePct)} color={margeColor} />
+      <Tile icon={Shield} label="Risico" value={`${risico}/10`} color={risicoColor} />
+      <Tile icon={Percent} label="Marge" value={fmtEUR(marge)} sub={fmtPct(margePct)} color={margeColor} />
     </div>
   );
 }
