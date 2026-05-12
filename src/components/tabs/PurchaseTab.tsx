@@ -61,11 +61,37 @@ export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
         <div className="bg-card border rounded-lg p-5 space-y-3">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Max. bod calculator</div>
           <Slider label={`Gewenste ROI: ${roi}%`} min={0} max={30} step={0.5} value={roi} onChange={setRoi} />
-          <div className="text-sm tabular space-y-1">
-            <Line k="Maximaal bod" v={fmtEUR(maxBod)} bold />
-            <Line k="Marge t.o.v. vraagprijs" v={`${fmtEUR(margeMax)} (${fmtPct(margePct)})`} color={margeMax >= 0 ? "text-positive" : "text-destructive"} />
-            <Line k="Renovatie meegerekend" v={fmtEUR(reno.totaal)} />
-          </div>
+          {(() => {
+            const bd = maxBodBreakdown(a, roi, reno.totaal, eigenGebruik);
+            const lowBidWarning = a.listing?.prijs && bd.bod < a.listing.prijs * 0.7;
+            return (
+              <>
+                <div className="text-sm tabular space-y-1 border-t pt-3">
+                  <Line k="Marktwaarde (basis)" v={fmtEUR(bd.marktwaarde)} />
+                  <Line k="− Renovatiekosten" v={fmtEUR(bd.renovatie)} color="text-destructive" />
+                  <Line k={`− OVB (${bd.ovbPct}%)`} v={fmtEUR(bd.ovb)} color="text-destructive" />
+                  <Line k="− Notaris/taxatie/keuring" v={fmtEUR(bd.bijkomend)} color="text-destructive" />
+                  <Line k={`− ROI-buffer (${bd.gewensteROI}% × marktwaarde)`} v={fmtEUR(bd.roiKorting)} color="text-destructive" />
+                  <div className="border-t pt-2 mt-2">
+                    <Line k="Maximaal bod" v={fmtEUR(bd.bod)} bold />
+                  </div>
+                  <Line
+                    k="Marge t.o.v. vraagprijs"
+                    v={`${fmtEUR(margeMax)} (${fmtPct(margePct)})`}
+                    color={margeMax >= 0 ? "text-positive" : "text-destructive"}
+                  />
+                </div>
+                {lowBidWarning && (
+                  <div className="flex items-start gap-2 text-xs rounded border border-warning/40 bg-warning/10 text-warning p-2.5">
+                    <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                    <span>
+                      Het maximale bod ligt meer dan 30% onder de vraagprijs. Controleer of de marktwaarde, renovatiekosten en ROI realistisch zijn.
+                    </span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         <div className="bg-card border rounded-lg p-5 space-y-3">
