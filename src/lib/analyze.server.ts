@@ -294,13 +294,15 @@ function parseListingHtml(html: string, url: string): Listing {
   const htmlLength = html.length;
   const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
   const nextDataFound = !!nextData;
-  const blocked = htmlLength < 100000 || !nextDataFound;
+  // "blocked" = we got nothing useful at all. With meta/JSON-LD/HTML fallbacks we can still parse a real page even without __NEXT_DATA__.
+  const tooSmall = htmlLength < 50000;
+  const regexResults: Record<string, string | number | null> = {};
+  const extraLogs: string[] = [];
 
   console.log("Raw HTML length:", htmlLength);
   console.log("NEXT_DATA found:", nextDataFound);
-  if (blocked) console.log("FUNDA BLOCKED — real page not returned");
 
-  // 1) Funda __NEXT_DATA__ — primaire bron
+  // 1) Funda __NEXT_DATA__ — primaire bron (best case)
   if (nextData) {
     try {
       const json = JSON.parse(nextData[1]);
@@ -314,7 +316,6 @@ function parseListingHtml(html: string, url: string): Listing {
         label = normalizeLabel(found.value);
         labelSource = "funda_next_data";
       }
-      // probeer ook adres/m2/prijs/bouwjaar uit next data
       const str = JSON.stringify(json);
       adres = adres ?? str.match(/"streetAddress"\s*:\s*"([^"]+)"/)?.[1];
       const m2m = str.match(/"floorArea"\s*:\s*(\d{2,4})/) ?? str.match(/"livingArea"\s*:\s*(\d{2,4})/);
@@ -328,35 +329,110 @@ function parseListingHtml(html: string, url: string): Listing {
     }
   }
 
-  // 2) JSON-LD (schema.org) als aanvulling
-  const ld = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
-  if (ld) {
+  // 2) JSON-LD structured data (often present even on bot-served pages)
+  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  let ldIdx = 0;
+  for (const block of ldBlocks) {
+    const inner = block.replace(/<script[^>]*>|<\/script>/gi, "").trim();
     try {
-      const data = JSON.parse(ld[1]);
-      const node = Array.isArray(data) ? data[0] : data;
-      prijs = prijs ?? (node?.offers?.price ? Number(node.offers.price) : undefined);
-      adres = adres ?? node?.address?.streetAddress;
-      m2 = m2 ?? (node?.floorSize?.value ? Number(node.floorSize.value) : undefined);
-      kamers = kamers ?? (node?.numberOfRooms ? Number(node.numberOfRooms) : undefined);
-    } catch {}
+      const data = JSON.parse(inner);
+      const nodes = Array.isArray(data) ? data : [data];
+      for (const node of nodes) {
+        regexResults[`json_ld[${ldIdx}].@type`] = (node?.["@type"] as string) ?? null;
+        if (node?.offers?.price && !prijs) prijs = Number(node.offers.price);
+        if (node?.address?.streetAddress && !adres) adres = String(node.address.streetAddress);
+        if (node?.floorSize?.value && !m2) m2 = Number(node.floorSize.value);
+        if (node?.numberOfRooms && !kamers) kamers = Number(node.numberOfRooms);
+        if (node?.description && !beschrijving) beschrijving = String(node.description).slice(0, 800);
+      }
+      ldIdx++;
+    } catch (e) {
+      extraLogs.push(`JSON-LD parse error block#${ldIdx}: ${(e as Error).message}`);
+    }
   }
+  regexResults["json_ld_blocks_found"] = ldBlocks.length;
 
-  // 3) HTML-fallback voor energielabel (Funda dt/dd kenmerken-blok)
-  if (!label) {
-    const dt = html.match(/Energielabel[\s\S]{0,400}?<dd[^>]*>\s*<[^>]*>?\s*([A-G]\+{0,4})/i)
-      ?? html.match(/Energielabel[\s\S]{0,200}?>\s*([A-G]\+{0,4})\s*</i);
-    if (dt) {
-      label = normalizeLabel(dt[1]);
-      rawEnergyLabel = rawEnergyLabel ?? dt[1];
-      fieldPath = fieldPath ?? "html.Energielabel";
-      labelSource = "funda_html";
-      console.log("[FUNDA] HTML-fallback energielabel:", label);
+  // 3) OpenGraph / meta tags (Funda always serves these, even on bot pages)
+  const metaContent = (prop: string) => {
+    const m =
+      html.match(new RegExp(`<meta[^>]*property=["']${prop}["'][^>]*content=["']([^"']+)["']`, "i")) ??
+      html.match(new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${prop}["']`, "i")) ??
+      html.match(new RegExp(`<meta[^>]*name=["']${prop}["'][^>]*content=["']([^"']+)["']`, "i"));
+    return m?.[1];
+  };
+  const metaTitle = metaContent("og:title");
+  const metaDesc = metaContent("og:description");
+  const metaPrice = metaContent("og:price:amount") ?? metaContent("product:price:amount");
+  const metaUrl = metaContent("og:url");
+  regexResults["meta.og:title"] = metaTitle ?? null;
+  regexResults["meta.og:description"] = metaDesc ?? null;
+  regexResults["meta.og:price"] = metaPrice ?? null;
+  regexResults["meta.og:url"] = metaUrl ?? null;
+
+  if (!adres && metaTitle) {
+    // og:title is meestal "Galvanistraat 16-bs, 3553 AT Utrecht [Te koop: € ...]"
+    adres = metaTitle.split(/[\[|·]/)[0].trim();
+  }
+  if (!beschrijving && metaDesc) beschrijving = metaDesc.slice(0, 800);
+  if (!prijs && metaPrice) {
+    const n = Number(String(metaPrice).replace(/[^\d]/g, ""));
+    if (n > 1000) prijs = n;
+  }
+  // Prijs uit og:title als laatste meta-redmiddel
+  if (!prijs && metaTitle) {
+    const pt = metaTitle.match(/€\s*([\d\.\s]+)/);
+    if (pt) {
+      const n = Number(pt[1].replace(/[^\d]/g, ""));
+      if (n > 1000) prijs = n;
     }
   }
 
-  prijs = prijs ?? num(pick(/€\s*([\d\.\s]+)\s*(?:k\.k\.|v\.o\.n\.)?/i));
-  m2 = m2 ?? num(pick(/(\d{2,4})\s*m²/));
-  bouwjaar = bouwjaar ?? num(pick(/Bouwjaar[^<]*<[^>]*>\s*(\d{4})/i)) ?? num(pick(/(\d{4})\s*<\/[^>]+>\s*<[^>]+>\s*Bouwjaar/i));
+  // 4) Directe HTML-regex fallbacks (werken op zowel volledige als bot-pagina)
+  const rxPrice = html.match(/€\s*([\d\.]{4,})\s*(?:k\.k\.|v\.o\.n\.|kosten koper)/i);
+  const rxArea = html.match(/(\d{2,4})\s*m²[^<]{0,40}?(?:woon|wonen)/i) ?? html.match(/woonoppervlakte[^<]{0,40}?(\d{2,4})\s*m²/i);
+  const rxEnergy = html.match(/energielabel[^A-Ga-g<]{0,40}?\b([A-G]\+{0,4})\b/i);
+  const rxRooms = html.match(/(\d{1,2})\s*kamers/i);
+  const rxYear = html.match(/bouwjaar[^\d]{0,40}?(\d{4})/i);
+  const rxPlot = html.match(/perceel[^\d]{0,40}?(\d{2,5})\s*m²/i);
+
+  regexResults["html.price_kk"] = rxPrice?.[1] ?? null;
+  regexResults["html.living_area_m2"] = rxArea?.[1] ?? null;
+  regexResults["html.energielabel"] = rxEnergy?.[1] ?? null;
+  regexResults["html.rooms"] = rxRooms?.[1] ?? null;
+  regexResults["html.bouwjaar"] = rxYear?.[1] ?? null;
+  regexResults["html.perceel_m2"] = rxPlot?.[1] ?? null;
+
+  if (!prijs && rxPrice) {
+    const n = Number(rxPrice[1].replace(/[^\d]/g, ""));
+    if (n > 1000) prijs = n;
+  }
+  if (!m2 && rxArea) m2 = Number(rxArea[1]);
+  if (!kamers && rxRooms) kamers = Number(rxRooms[1]);
+  if (!bouwjaar && rxYear) bouwjaar = Number(rxYear[1]);
+  if (!label && rxEnergy) {
+    label = normalizeLabel(rxEnergy[1]);
+    rawEnergyLabel = rawEnergyLabel ?? rxEnergy[1];
+    fieldPath = fieldPath ?? "html.energielabel";
+    labelSource = "funda_html";
+  }
+
+  // 5) Energielabel — extra dt/dd kenmerken-blok als laatste redmiddel
+  if (!label) {
+    const dt =
+      html.match(/Energielabel[\s\S]{0,400}?<dd[^>]*>\s*<[^>]*>?\s*([A-G]\+{0,4})/i) ??
+      html.match(/Energielabel[\s\S]{0,200}?>\s*([A-G]\+{0,4})\s*</i);
+    if (dt) {
+      label = normalizeLabel(dt[1]);
+      rawEnergyLabel = rawEnergyLabel ?? dt[1];
+      fieldPath = fieldPath ?? "html.Energielabel.dt_dd";
+      labelSource = "funda_html_dt";
+      regexResults["html.energielabel_dt"] = dt[1];
+    }
+  }
+
+  // Een pagina is alleen écht "blocked" als we hier helemaal niets uit konden halen
+  const blocked = tooSmall || (!nextDataFound && !prijs && !adres && !label && !metaTitle);
+  if (blocked) console.log("FUNDA BLOCKED — real page not returned");
 
   console.log("Energy label raw value:", rawEnergyLabel ?? null);
   console.log("Energy label field path used:", fieldPath ?? null);
@@ -382,13 +458,26 @@ function parseListingHtml(html: string, url: string): Listing {
       raw_energy_label: rawEnergyLabel,
       energy_label_field_path: fieldPath,
       final_energy_label: label,
+      html_regex_results: regexResults,
       logs: [
         `Raw HTML length: ${htmlLength}`,
         `NEXT_DATA found: ${nextDataFound}`,
+        `JSON-LD blocks found: ${ldBlocks.length}`,
+        `meta og:title: ${metaTitle ?? "null"}`,
+        `meta og:description: ${metaDesc ? metaDesc.slice(0, 120) + "…" : "null"}`,
+        `meta og:price: ${metaPrice ?? "null"}`,
+        `html regex price (k.k.): ${rxPrice?.[1] ?? "null"}`,
+        `html regex living area: ${rxArea?.[1] ?? "null"}`,
+        `html regex energielabel: ${rxEnergy?.[1] ?? "null"}`,
+        `html regex rooms: ${rxRooms?.[1] ?? "null"}`,
+        `html regex bouwjaar: ${rxYear?.[1] ?? "null"}`,
+        `html regex perceel: ${rxPlot?.[1] ?? "null"}`,
         `Energy label raw value: ${rawEnergyLabel ?? "null"}`,
         `Energy label field path used: ${fieldPath ?? "null"}`,
+        `Energy label source: ${labelSource}`,
         `Final energy label returned: ${label ?? "null"}`,
-        ...(blocked ? ["FUNDA BLOCKED — real page not returned"] : []),
+        ...extraLogs,
+        ...(blocked ? ["FUNDA BLOCKED — geen bruikbare data uit page"] : []),
       ],
     },
   };

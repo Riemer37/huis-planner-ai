@@ -31,6 +31,19 @@ export function FundaDebugPanel({ a }: { a: PropertyAnalysis }) {
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Function logs</div>
           <pre className="max-h-40 overflow-auto rounded border bg-muted p-3 text-xs whitespace-pre-wrap">{debug.logs.join("\n")}</pre>
         </div>
+        {debug.html_regex_results && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">HTML / meta / JSON-LD regex results</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1 rounded border bg-muted p-3 text-[11px] font-mono">
+              {Object.entries(debug.html_regex_results).map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <span className="text-muted-foreground shrink-0">{k}:</span>
+                  <span className={v == null || v === "" ? "text-destructive" : "text-foreground font-semibold truncate"} title={String(v)}>{v == null || v === "" ? "null" : String(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Raw Funda __NEXT_DATA__ JSON</div>
           <pre className="max-h-96 overflow-auto rounded border bg-muted p-3 text-[11px] whitespace-pre-wrap">{JSON.stringify(debug.raw_next_data ?? null, null, 2)}</pre>
