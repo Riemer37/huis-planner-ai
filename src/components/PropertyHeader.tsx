@@ -1,5 +1,5 @@
 import { ExternalLink, MapPin } from "lucide-react";
-import type { PropertyAnalysis } from "@/lib/types";
+import type { DataSource, PropertyAnalysis } from "@/lib/types";
 import { SourceBadge } from "./SourceBadge";
 
 const adviesStyle = (advies: string) => {
@@ -28,7 +28,7 @@ function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ValuePill({ children, source }: { children: React.ReactNode; source?: PropertyAnalysis["field_sources"][string] }) {
+function ValuePill({ children, source }: { children: React.ReactNode; source?: DataSource }) {
   return <Pill><span className="inline-flex items-center gap-1.5">{children}<SourceBadge source={source} /></span></Pill>;
 }
 
