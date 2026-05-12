@@ -117,7 +117,15 @@ function VastgoedAI() {
       <Sidebar onAnalyze={handleAnalyze} onSelectHistory={(a) => { setAnalysis(a); setTab("overzicht"); }} loading={loading} loadingStages={stages} current={analysis} />
 
       <main className="flex-1 min-w-0 flex flex-col">
-        {!analysis ? (
+        {prefill ? (
+          <PrefillForm
+            prefill={prefill}
+            pandtype={pendingPandtype}
+            loading={loading}
+            onCancel={() => { setPrefill(null); setError(null); }}
+            onSubmit={handleStartAnalysis}
+          />
+        ) : !analysis ? (
           <EmptyState error={error} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
         ) : (
           <>
