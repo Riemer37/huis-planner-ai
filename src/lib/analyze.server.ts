@@ -126,29 +126,30 @@ export async function scrapeListing(targetUrl: string) {
   }
 }
 
-// Recursively zoek een veld dat lijkt op een energielabel sleutel
-function deepFindEnergyLabel(obj: any, depth = 0): string | undefined {
-  if (!obj || depth > 8) return undefined;
-  if (typeof obj !== "object") return undefined;
-  for (const [k, v] of Object.entries(obj)) {
-    const key = k.toLowerCase();
-    if (
-      (key === "energylabel" || key === "energielabel" || key === "energy_label" || key === "label" && /energ/i.test(JSON.stringify(obj).slice(0, 200)))
-    ) {
-      if (typeof v === "string" && /^[A-G](\+{1,4})?$/i.test(v.trim())) return v.trim().toUpperCase();
-      if (v && typeof v === "object") {
-        const inner = (v as any).label ?? (v as any).value ?? (v as any).code ?? (v as any).name;
-        if (typeof inner === "string" && /^[A-G](\+{1,4})?$/i.test(inner.trim())) return inner.trim().toUpperCase();
+function isEnergyLabelValue(value: unknown): value is string {
+  return typeof value === "string" && /^(A\+{0,4}|[B-G])$/i.test(value.trim());
+}
+
+function findEnergyLabelCandidates(obj: any, path: string[] = [], depth = 0): { value: string; path: string; score: number }[] {
+  if (!obj || typeof obj !== "object" || depth > 12) return [];
+  const candidates: { value: string; path: string; score: number }[] = [];
+  for (const [key, value] of Object.entries(obj)) {
+    const nextPath = [...path, key];
+    const pathText = nextPath.join(".").toLowerCase();
+    const keyText = key.toLowerCase();
+    const energyContext = /(energy|energie|energielabel|energieklasse|labelletter)/i.test(pathText);
+    const exactEnergyKey = /^(energylabel|energielabel|energy_label|energie_label|energieklasse|labelletter)$/i.test(keyText);
+    if (isEnergyLabelValue(value) && (energyContext || exactEnergyKey)) {
+      candidates.push({ value: value.trim().toUpperCase(), path: nextPath.join("."), score: exactEnergyKey ? 100 : 70 });
+    } else if (value && typeof value === "object" && (energyContext || exactEnergyKey)) {
+      const inner = (value as any).label ?? (value as any).value ?? (value as any).code ?? (value as any).name ?? (value as any).text;
+      if (isEnergyLabelValue(inner)) {
+        candidates.push({ value: inner.trim().toUpperCase(), path: `${nextPath.join(".")}.${["label", "value", "code", "name", "text"].find((k) => (value as any)[k] === inner) ?? "value"}`, score: exactEnergyKey ? 95 : 75 });
       }
     }
+    if (value && typeof value === "object") candidates.push(...findEnergyLabelCandidates(value, nextPath, depth + 1));
   }
-  for (const v of Object.values(obj)) {
-    if (v && typeof v === "object") {
-      const r = deepFindEnergyLabel(v, depth + 1);
-      if (r) return r;
-    }
-  }
-  return undefined;
+  return candidates.sort((a, b) => b.score - a.score || a.path.length - b.path.length);
 }
 
 function normalizeLabel(s?: string): string | undefined {
