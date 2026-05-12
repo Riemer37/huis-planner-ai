@@ -198,7 +198,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         buurt: pdok?.buurt ? "bag" : "schatting",
         living_area_m2: listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
         plot_area_m2: isApt ? "bag" : "schatting",
-        build_year: bag?.bouwjaar ? "bag" : listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : "schatting",
+        build_year: (bag as any)?.bouwjaar ? "bag" : listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : "schatting",
         rooms: listing?.kamers && !listing.funda_debug?.blocked ? "funda" : "schatting",
         asking_price: listing?.prijs && !listing.funda_debug?.blocked ? "funda" : "schatting",
         energy_label: fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
