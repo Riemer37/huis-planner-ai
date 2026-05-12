@@ -88,6 +88,9 @@ function VastgoedAI() {
           <EmptyState error={error} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
         ) : (
           <>
+            <div className="px-6 pt-6 bg-background">
+              <FundaDebugPanel a={analysis} />
+            </div>
             <PropertyHeader a={analysis} />
             <KpiStrip a={analysis} />
             <Warnings a={analysis} />
@@ -117,7 +120,6 @@ function VastgoedAI() {
               {tab === "exit" && <ExitTab a={analysis} />}
               <div className="mt-6 space-y-4">
                 <ManualOverridePanel a={analysis} onSave={handleManualSave} />
-                <FundaDebugPanel a={analysis} />
               </div>
             </div>
           </>

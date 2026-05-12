@@ -1,3 +1,5 @@
+import type { Listing } from "./types";
+
 // Helpers used only on server
 export async function fetchPdok(query: string) {
   const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(query)}&fl=id,weergavenaam,centroide_ll,woonplaatsnaam,gemeentenaam,buurtnaam,postcode,straatnaam,huisnummer,adresseerbaarobject_id,nummeraanduiding_id&rows=1`;
@@ -112,40 +114,114 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
 }
 
 // ---------- ScraperAPI — Funda / Pararius listing ----------
-async function fetchViaScraperApi(key: string, targetUrl: string): Promise<string | null> {
-  const encoded = encodeURIComponent(targetUrl);
-  const api = `http://api.scraperapi.com/?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
-  const r = await fetch(api, {
-    headers: {
-      "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
-      "X-MyHeader-Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "X-MyHeader-User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    },
-  });
-  if (!r.ok) {
-    console.log(`[SCRAPERAPI] HTTP ${r.status} for ${targetUrl}`);
-    return null;
-  }
-  return await r.text();
+type ScraperApiAttemptDebug = {
+  scraper_url: string;
+  response_status?: number;
+  html_length: number;
+  contains_next_data: boolean;
+  first_500_chars: string;
+  account_status_header?: string | null;
+  credits_remaining?: string | null;
+  error?: string;
+};
+
+type ScraperApiFetchResult = {
+  html: string | null;
+  debug: ScraperApiAttemptDebug;
+};
+
+function buildScraperApiDebugLines(debug: ScraperApiAttemptDebug) {
+  return [
+    `1. ScraperAPI URL being called: ${debug.scraper_url}`,
+    `2. Response status: ${debug.response_status ?? "NO_RESPONSE"}`,
+    `3. HTML length received: ${debug.html_length}`,
+    `4. Contains __NEXT_DATA__: ${debug.contains_next_data}`,
+    `5. First 500 characters of response: ${debug.first_500_chars}`,
+    `6. ScraperAPI account status header: ${debug.account_status_header ?? "null"}`,
+    `7. ScraperAPI credits remaining: ${debug.credits_remaining ?? "null"}`,
+    ...(debug.error ? [`ScraperAPI fetch error: ${debug.error}`] : []),
+  ];
 }
 
-export async function scrapeListing(targetUrl: string) {
+async function fetchViaScraperApi(key: string, targetUrl: string): Promise<ScraperApiFetchResult> {
+  const encoded = encodeURIComponent(targetUrl);
+  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
+  const safeApi = api.replace(key, "[REDACTED_SCRAPER_API_KEY]");
+  try {
+    const r = await fetch(api, {
+      headers: {
+        "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
+        "X-MyHeader-Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "X-MyHeader-User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      },
+    });
+    const html = await r.text();
+    const debug: ScraperApiAttemptDebug = {
+      scraper_url: safeApi,
+      response_status: r.status,
+      html_length: html.length,
+      contains_next_data: html.includes("__NEXT_DATA__"),
+      first_500_chars: html.substring(0, 500),
+      account_status_header: r.headers.get("sa-statuscode"),
+      credits_remaining: r.headers.get("sa-credit-left"),
+    };
+    buildScraperApiDebugLines(debug).forEach((line) => console.log(line));
+    if (!r.ok) console.log(`[SCRAPERAPI] HTTP ${r.status} for ${targetUrl}`);
+    return { html: r.ok ? html : null, debug };
+  } catch (e) {
+    const debug: ScraperApiAttemptDebug = {
+      scraper_url: safeApi,
+      html_length: 0,
+      contains_next_data: false,
+      first_500_chars: "",
+      account_status_header: null,
+      credits_remaining: null,
+      error: (e as Error).message,
+    };
+    buildScraperApiDebugLines(debug).forEach((line) => console.log(line));
+    return { html: null, debug };
+  }
+}
+
+export async function scrapeListing(targetUrl: string): Promise<Listing | null> {
   const key = process.env.SCRAPER_API_KEY;
   if (!key) return null;
   try {
-    let html = await fetchViaScraperApi(key, targetUrl);
+    const scraperAttempts: ScraperApiAttemptDebug[] = [];
+    let fetched = await fetchViaScraperApi(key, targetUrl);
+    scraperAttempts.push(fetched.debug);
+    let html = fetched.html;
     let attempts = 1;
     const isBlocked = (h: string | null) => !h || h.length < 100000 || !h.includes("__NEXT_DATA__");
     if (isBlocked(html)) {
       console.log(`[SCRAPERAPI] Attempt 1 blocked (len=${html?.length ?? 0}). Retrying once.`);
-      html = await fetchViaScraperApi(key, targetUrl);
+      fetched = await fetchViaScraperApi(key, targetUrl);
+      scraperAttempts.push(fetched.debug);
+      html = fetched.html;
       attempts = 2;
     }
-    if (!html) return null;
+    if (!html) {
+      return {
+        url: targetUrl,
+        bron: "manual" as const,
+        funda_debug: {
+          html_length: scraperAttempts.at(-1)?.html_length ?? 0,
+          next_data_found: scraperAttempts.some((a) => a.contains_next_data),
+          blocked: true,
+          scraperapi_attempts: scraperAttempts,
+          scraperapi_debug_output: scraperAttempts.flatMap(buildScraperApiDebugLines),
+          raw_next_data: null,
+          logs: scraperAttempts.flatMap(buildScraperApiDebugLines),
+        },
+      };
+    }
     const parsed = parseListingHtml(html, targetUrl);
     if (parsed?.funda_debug) {
       (parsed.funda_debug as any).attempts = attempts;
+      parsed.funda_debug.scraperapi_attempts = scraperAttempts;
+      parsed.funda_debug.scraperapi_debug_output = scraperAttempts.flatMap(buildScraperApiDebugLines);
+      parsed.funda_debug.logs = [...scraperAttempts.flatMap(buildScraperApiDebugLines), ...parsed.funda_debug.logs];
     }
     return parsed;
   } catch (e) {
@@ -186,7 +262,7 @@ function normalizeLabel(s?: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
-function parseListingHtml(html: string, url: string) {
+function parseListingHtml(html: string, url: string): Listing {
   const pick = (re: RegExp) => {
     const m = html.match(re);
     return m?.[1]?.trim();
