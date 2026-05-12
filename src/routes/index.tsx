@@ -182,4 +182,3 @@ function EmptyState({ error, loading, onAnalyze }: { error: string | null; loadi
     </div>
   );
 }
-}
