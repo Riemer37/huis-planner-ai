@@ -15,12 +15,29 @@ import {
   scrapeListing,
   synthesizeWoz,
 } from "./analyze.server";
-import type { PropertyAnalysis, PandType } from "./types";
+import type { PropertyAnalysis, PandType, Listing } from "./types";
+
+const ManualInputSchema = z
+  .object({
+    energielabel: z.string().optional(),
+    living_area_m2: z.number().optional(),
+    plot_area_m2: z.number().optional(),
+    plot_not_applicable: z.boolean().optional(),
+    asking_price: z.number().optional(),
+    rooms: z.number().optional(),
+    build_year: z.number().optional(),
+    woning_type: z.string().optional(),
+    staat: z.string().optional(),
+    erfpacht: z.boolean().optional(),
+    bijzonderheden: z.string().optional(),
+  })
+  .optional();
 
 const InputSchema = z.object({
   query: z.string().min(2).max(300),
   pandtype: z.enum(["woning", "nieuwbouw", "commercieel", "gemengd"]),
   isUrl: z.boolean().optional(),
+  manualInput: ManualInputSchema,
 });
 
 function extractHuisnummer(adres?: string): string | undefined {
@@ -35,11 +52,40 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const errors: Record<string, string> = {};
     const bronnen: string[] = ["PDOK"];
     const isUrl = data.isUrl ?? /^https?:\/\//i.test(data.query);
+    const manual = data.manualInput;
+    const hasManual = !!manual;
 
-    // Stap 0: ScraperAPI als URL
+    // Stap 0: Scraping ALLEEN als er géén manual input is. Bij manual input is de gebruiker autoriteit.
     let listing: PropertyAnalysis["listing"] = undefined;
     let addressForPdok = data.query;
-    if (isUrl) {
+    if (hasManual) {
+      // Bouw listing direct uit manual input — 100% betrouwbaar, geen scraping
+      const desc: string[] = [];
+      if (manual!.woning_type) desc.push(`Type woning: ${manual!.woning_type}`);
+      if (manual!.staat) desc.push(`Staat van onderhoud: ${manual!.staat}`);
+      if (typeof manual!.erfpacht === "boolean") desc.push(`Erfpacht: ${manual!.erfpacht ? "ja" : "nee"}`);
+      if (manual!.bijzonderheden) desc.push(`Bijzonderheden: ${manual!.bijzonderheden}`);
+      const built: Listing = {
+        url: isUrl ? data.query : undefined,
+        prijs: manual!.asking_price,
+        vraagprijs: manual!.asking_price,
+        m2: manual!.living_area_m2,
+        bouwjaar: manual!.build_year,
+        perceel_m2: manual!.plot_not_applicable ? undefined : manual!.plot_area_m2,
+        energielabel: manual!.energielabel,
+        kamers: manual!.rooms,
+        erfpacht: manual!.erfpacht,
+        beschrijving: desc.join(". "),
+        bron: "manual",
+      };
+      listing = built;
+      bronnen.push("Handmatige invoer");
+      // Probeer adres uit URL af te leiden voor PDOK
+      if (isUrl) {
+        const m = data.query.match(/\/([a-z0-9\-]+)\/(huis|appartement|object)\-([0-9]+)/i);
+        if (m) addressForPdok = m[1].replace(/\-/g, " ");
+      }
+    } else if (isUrl) {
       const scraped = await scrapeListing(data.query).catch((e: any) => {
         errors.scraper = String(e?.message ?? e);
         return null;
@@ -54,6 +100,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         if (m) addressForPdok = m[1].replace(/\-/g, " ");
       }
     }
+
 
     // Fase 1: PDOK
     let pdok: PropertyAnalysis["pdok"];
@@ -131,21 +178,15 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const epLabel = energie?.label?.toUpperCase().trim();
     console.log(`[ENERGIELABEL] funda="${fundaLabel ?? ""}" ep_online="${epLabel ?? ""}" isUrl=${isUrl}`);
     let energielabel: PropertyAnalysis["energielabel"];
+    const fundaBron = hasManual ? "Handmatig ingevoerd" : "Funda listing";
     if (fundaLabel && epLabel) {
       const conflict = fundaLabel !== epLabel;
-      energielabel = {
-        label: fundaLabel,
-        bron: "Funda listing",
-        label_secondary: epLabel,
-        bron_secondary: "EP-online",
-        conflict,
-      };
+      energielabel = { label: fundaLabel, bron: fundaBron, label_secondary: epLabel, bron_secondary: "EP-online", conflict };
     } else if (fundaLabel) {
-      energielabel = { label: fundaLabel, bron: "Funda listing" };
+      energielabel = { label: fundaLabel, bron: fundaBron };
     } else if (epLabel) {
       energielabel = { label: epLabel, bron: "EP-online" };
     } else {
-      // Niet raden — toon Onbekend met duidelijke bron-indicatie
       energielabel = { label: "Onbekend", bron: isUrl ? "Niet gevonden in listing" : "Niet beschikbaar" };
     }
     console.log(`[ENERGIELABEL] FINAL label="${energielabel.label}" bron="${energielabel.bron}"`);
@@ -196,15 +237,16 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         adres: pdok ? "bag" : "schatting",
         woonplaats: pdok ? "bag" : "schatting",
         buurt: pdok?.buurt ? "bag" : "schatting",
-        living_area_m2: listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
-        plot_area_m2: listing?.perceel_m2 && !listing.funda_debug?.blocked ? "funda" : isApt ? "bag" : "schatting",
-        build_year: listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : (bag as any)?.bouwjaar ? "bag" : "schatting",
-        rooms: listing?.kamers && !listing.funda_debug?.blocked ? "funda" : "schatting",
-        asking_price: listing?.prijs && !listing.funda_debug?.blocked ? "funda" : "schatting",
-        energy_label: fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
+        living_area_m2: hasManual && manual!.living_area_m2 ? "handmatig" : listing?.m2 && !listing.funda_debug?.blocked && !hasManual ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
+        plot_area_m2: hasManual && manual!.plot_area_m2 ? "handmatig" : listing?.perceel_m2 && !listing.funda_debug?.blocked && !hasManual ? "funda" : isApt ? "bag" : "schatting",
+        build_year: hasManual && manual!.build_year ? "handmatig" : listing?.bouwjaar && !listing.funda_debug?.blocked && !hasManual ? "funda" : (bag as any)?.bouwjaar ? "bag" : "schatting",
+        rooms: hasManual && manual!.rooms ? "handmatig" : listing?.kamers && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
+        asking_price: hasManual && manual!.asking_price ? "handmatig" : listing?.prijs && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
+        energy_label: hasManual && manual!.energielabel ? "handmatig" : fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
         market_value: altum?.marktwaarde ? "altum_ai" : "schatting",
         rent_value: altum?.huurwaarde ? "altum_ai" : "schatting",
       },
+
     };
     return result;
   });
