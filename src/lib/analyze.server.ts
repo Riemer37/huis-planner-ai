@@ -389,24 +389,44 @@ function parseListingHtml(html: string, url: string): Listing {
 
   // 4) Directe HTML-regex fallbacks (werken op zowel volledige als bot-pagina)
   const rxPrice = html.match(/€\s*([\d\.]{4,})\s*(?:k\.k\.|v\.o\.n\.|kosten koper)/i);
-  const rxArea = html.match(/(\d{2,4})\s*m²[^<]{0,40}?(?:woon|wonen)/i) ?? html.match(/woonoppervlakte[^<]{0,40}?(\d{2,4})\s*m²/i);
+
+  const areaPatterns = [
+    /woonoppervlakte[^\d<]{0,40}(\d{2,4})\s*m/i,
+    /(\d{2,4})\s*m²[^<]{0,20}woon/i,
+    /"livingArea"\s*:\s*(\d{2,4})/i,
+    /"floorArea"\s*:\s*(\d{2,4})/i,
+    /gebruiksoppervlakte[^\d<]{0,40}(\d{2,4})/i,
+    /woonopp[^\d<]{0,40}(\d{2,4})/i,
+  ];
+  let rxAreaVal: string | null = null;
+  for (const p of areaPatterns) { const mm = html.match(p); if (mm) { rxAreaVal = mm[1]; break; } }
+
+  const plotPatterns = [
+    /perceeloppervlakte[^\d<]{0,40}(\d{2,5})\s*m/i,
+    /"plotArea"\s*:\s*(\d{2,5})/i,
+    /"lotSize"\s*:\s*(\d{2,5})/i,
+    /grondoppervlak[^\d<]{0,40}(\d{2,5})/i,
+    /perceel[^\d<]{0,40}(\d{2,5})\s*m/i,
+  ];
+  let rxPlotVal: string | null = null;
+  for (const p of plotPatterns) { const mm = html.match(p); if (mm) { rxPlotVal = mm[1]; break; } }
+
   const rxEnergy = html.match(/energielabel[^A-Ga-g<]{0,40}?\b([A-G]\+{0,4})\b/i);
   const rxRooms = html.match(/(\d{1,2})\s*kamers/i);
   const rxYear = html.match(/bouwjaar[^\d]{0,40}?(\d{4})/i);
-  const rxPlot = html.match(/perceel[^\d]{0,40}?(\d{2,5})\s*m²/i);
 
   regexResults["html.price_kk"] = rxPrice?.[1] ?? null;
-  regexResults["html.living_area_m2"] = rxArea?.[1] ?? null;
+  regexResults["html.living_area_m2"] = rxAreaVal;
   regexResults["html.energielabel"] = rxEnergy?.[1] ?? null;
   regexResults["html.rooms"] = rxRooms?.[1] ?? null;
   regexResults["html.bouwjaar"] = rxYear?.[1] ?? null;
-  regexResults["html.perceel_m2"] = rxPlot?.[1] ?? null;
+  regexResults["html.perceel_m2"] = rxPlotVal;
 
   if (!prijs && rxPrice) {
     const n = Number(rxPrice[1].replace(/[^\d]/g, ""));
     if (n > 1000) prijs = n;
   }
-  if (!m2 && rxArea) m2 = Number(rxArea[1]);
+  if (!m2 && rxAreaVal) m2 = Number(rxAreaVal);
   if (!kamers && rxRooms) kamers = Number(rxRooms[1]);
   if (!bouwjaar && rxYear) bouwjaar = Number(rxYear[1]);
   if (!label && rxEnergy) {
@@ -446,6 +466,7 @@ function parseListingHtml(html: string, url: string): Listing {
     m2,
     kamers,
     bouwjaar,
+    perceel_m2: rxPlotVal ? Number(rxPlotVal) : undefined,
     energielabel: label,
     adres,
     beschrijving,
@@ -467,11 +488,11 @@ function parseListingHtml(html: string, url: string): Listing {
         `meta og:description: ${metaDesc ? metaDesc.slice(0, 120) + "…" : "null"}`,
         `meta og:price: ${metaPrice ?? "null"}`,
         `html regex price (k.k.): ${rxPrice?.[1] ?? "null"}`,
-        `html regex living area: ${rxArea?.[1] ?? "null"}`,
+        `html regex living area: ${rxAreaVal ?? "null"}`,
         `html regex energielabel: ${rxEnergy?.[1] ?? "null"}`,
         `html regex rooms: ${rxRooms?.[1] ?? "null"}`,
         `html regex bouwjaar: ${rxYear?.[1] ?? "null"}`,
-        `html regex perceel: ${rxPlot?.[1] ?? "null"}`,
+        `html regex perceel: ${rxPlotVal ?? "null"}`,
         `Energy label raw value: ${rawEnergyLabel ?? "null"}`,
         `Energy label field path used: ${fieldPath ?? "null"}`,
         `Energy label source: ${labelSource}`,

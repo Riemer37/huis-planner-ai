@@ -9,6 +9,7 @@ export interface Listing {
   vraagprijs?: number;
   m2?: number;
   bouwjaar?: number;
+  perceel_m2?: number;
   energielabel?: string;
   kamers?: number;
   slaapkamers?: number;

@@ -12,7 +12,7 @@ import { PurchaseTab } from "@/components/tabs/PurchaseTab";
 import { RenovationTab } from "@/components/tabs/RenovationTab";
 import { ExitTab } from "@/components/tabs/ExitTab";
 import { ManualOverridePanel } from "@/components/ManualOverridePanel";
-import { FundaDebugPanel } from "@/components/FundaDebugPanel";
+
 import { analyzeProperty } from "@/lib/analyze.functions";
 import { applyManualOverrides } from "@/lib/overrides";
 import { findCached, saveAnalysis } from "@/lib/storage";
@@ -88,9 +88,6 @@ function VastgoedAI() {
           <EmptyState error={error} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
         ) : (
           <>
-            <div className="px-6 pt-6 bg-background">
-              <FundaDebugPanel a={analysis} />
-            </div>
             <PropertyHeader a={analysis} />
             <KpiStrip a={analysis} />
             <Warnings a={analysis} />
