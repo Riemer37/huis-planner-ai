@@ -243,15 +243,16 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         adres: pdok ? "bag" : "schatting",
         woonplaats: pdok ? "bag" : "schatting",
         buurt: pdok?.buurt ? "bag" : "schatting",
-        living_area_m2: listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
-        plot_area_m2: listing?.perceel_m2 && !listing.funda_debug?.blocked ? "funda" : isApt ? "bag" : "schatting",
-        build_year: listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : (bag as any)?.bouwjaar ? "bag" : "schatting",
-        rooms: listing?.kamers && !listing.funda_debug?.blocked ? "funda" : "schatting",
-        asking_price: listing?.prijs && !listing.funda_debug?.blocked ? "funda" : "schatting",
-        energy_label: fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
+        living_area_m2: hasManual && manual!.living_area_m2 ? "handmatig" : listing?.m2 && !listing.funda_debug?.blocked && !hasManual ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
+        plot_area_m2: hasManual && manual!.plot_area_m2 ? "handmatig" : listing?.perceel_m2 && !listing.funda_debug?.blocked && !hasManual ? "funda" : isApt ? "bag" : "schatting",
+        build_year: hasManual && manual!.build_year ? "handmatig" : listing?.bouwjaar && !listing.funda_debug?.blocked && !hasManual ? "funda" : (bag as any)?.bouwjaar ? "bag" : "schatting",
+        rooms: hasManual && manual!.rooms ? "handmatig" : listing?.kamers && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
+        asking_price: hasManual && manual!.asking_price ? "handmatig" : listing?.prijs && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
+        energy_label: hasManual && manual!.energielabel ? "handmatig" : fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
         market_value: altum?.marktwaarde ? "altum_ai" : "schatting",
         rent_value: altum?.huurwaarde ? "altum_ai" : "schatting",
       },
+
     };
     return result;
   });
