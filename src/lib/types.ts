@@ -6,12 +6,16 @@ export type Advies = "Kopen" | "Voorwaardelijk" | "Vermijden";
 export interface Listing {
   url?: string;
   prijs?: number;
+  vraagprijs?: number;
   m2?: number;
   bouwjaar?: number;
   energielabel?: string;
   kamers?: number;
+  slaapkamers?: number;
   adres?: string;
   erfpacht?: boolean;
+  beschrijving?: string;
+  bron?: "scraperapi" | "manual";
 }
 
 export interface PdokResult {
