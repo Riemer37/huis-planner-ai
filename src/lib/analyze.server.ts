@@ -145,7 +145,7 @@ function buildScraperApiDebugLines(debug: ScraperApiAttemptDebug) {
 
 async function fetchViaScraperApi(key: string, targetUrl: string): Promise<ScraperApiFetchResult> {
   const encoded = encodeURIComponent(targetUrl);
-  const api = `http://api.scraperapi.com/?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
+  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
   const safeApi = api.replace(key, "[REDACTED_SCRAPER_API_KEY]");
   try {
     const r = await fetch(api, {
