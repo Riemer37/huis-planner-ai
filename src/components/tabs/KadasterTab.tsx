@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, Circle, XCircle, Info } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
 import { fmtEUR, fmtNum, isApartment } from "@/lib/calculations";
+import { SourceBadge } from "@/components/SourceBadge";
 
 const labels = ["A+++", "A++", "A+", "A", "B", "C", "D", "E", "F", "G"];
 
@@ -29,14 +30,15 @@ export function KadasterTab({ a }: { a: PropertyAnalysis }) {
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-3">Officiële BAG-gegevens</div>
           <table className="w-full text-sm">
             <tbody>
-              <Row k="Adres" v={a.pdok?.adres} conf={a.pdok ? "ok" : "fail"} confTitle="PDOK Locatieserver" />
-              <Row k="Woonplaats" v={a.pdok?.woonplaats} conf={a.pdok ? "ok" : "fail"} confTitle="PDOK" />
-              <Row k="Buurt" v={a.pdok?.buurt} conf={a.pdok?.buurt ? "ok" : "fail"} confTitle="PDOK" />
+              <Row k="Adres" v={a.pdok?.adres} conf={a.pdok ? "ok" : "fail"} confTitle="PDOK Locatieserver" source={a.field_sources?.adres} />
+              <Row k="Woonplaats" v={a.pdok?.woonplaats} conf={a.pdok ? "ok" : "fail"} confTitle="PDOK" source={a.field_sources?.woonplaats} />
+              <Row k="Buurt" v={a.pdok?.buurt} conf={a.pdok?.buurt ? "ok" : "fail"} confTitle="PDOK" source={a.field_sources?.buurt} />
               <Row
                 k="Woonoppervlakte (VBO)"
-                v={a.bag?.oppervlakte ? `${fmtNum(a.bag.oppervlakte)} m²` : "—"}
-                conf={a.bag?.oppervlakte ? "ok" : "fail"}
+                v={(a.listing?.m2 ?? a.bag?.oppervlakte) ? `${fmtNum(a.listing?.m2 ?? a.bag?.oppervlakte)} m²` : "—"}
+                conf={(a.listing?.m2 ?? a.bag?.oppervlakte) ? "ok" : "fail"}
                 confTitle="BAG verblijfsobject"
+                source={a.field_sources?.living_area_m2}
               />
               {apt ? (
                 <tr className="border-b last:border-b-0">
@@ -45,7 +47,7 @@ export function KadasterTab({ a }: { a: PropertyAnalysis }) {
                     Perceeloppervlakte
                   </td>
                   <td className="py-1.5 text-right text-xs text-muted-foreground italic" title="Bij appartementen behoort het perceel toe aan de VvE — niet aan de individuele unit.">
-                    Gedeeld perceel — n.v.t. voor dit appartementstype
+                    <span className="inline-flex items-center justify-end gap-2">Gedeeld perceel — n.v.t. voor dit appartementstype <SourceBadge source={a.field_sources?.plot_area_m2} /></span>
                   </td>
                 </tr>
               ) : (
@@ -54,12 +56,13 @@ export function KadasterTab({ a }: { a: PropertyAnalysis }) {
                   v={a.perceel_m2 ? `${fmtNum(a.perceel_m2)} m²` : "—"}
                   conf={a.perceel_m2 ? "estimate" : "fail"}
                   confTitle="Schatting"
+                  source={a.field_sources?.plot_area_m2}
                 />
               )}
-              <Row k="Bouwjaar" v={a.bag?.bouwjaar ?? a.listing?.bouwjaar} conf={a.bag?.bouwjaar ? "ok" : a.listing?.bouwjaar ? "estimate" : "fail"} confTitle="BAG / Listing" />
-              <Row k="Gebruiksdoel" v={a.bag?.gebruiksdoel} conf={a.bag?.gebruiksdoel ? "ok" : "fail"} confTitle="BAG" />
-              <Row k="Status" v={a.bag?.status} conf={a.bag?.status ? "ok" : "fail"} confTitle="BAG" />
-              <Row k="Splitsingstatus" v={(a.bag?.vbos ?? 1) > 1 ? `Gesplitst (${a.bag?.vbos} eenheden)` : "Niet gesplitst"} conf={a.bag ? "ok" : "fail"} confTitle="BAG" />
+              <Row k="Bouwjaar" v={a.bag?.bouwjaar ?? a.listing?.bouwjaar} conf={a.bag?.bouwjaar ? "ok" : a.listing?.bouwjaar ? "estimate" : "fail"} confTitle="BAG / Listing" source={a.field_sources?.build_year} />
+              <Row k="Gebruiksdoel" v={a.bag?.gebruiksdoel} conf={a.bag?.gebruiksdoel ? "ok" : "fail"} confTitle="BAG" source="bag" />
+              <Row k="Status" v={a.bag?.status} conf={a.bag?.status ? "ok" : "fail"} confTitle="BAG" source="bag" />
+              <Row k="Splitsingstatus" v={(a.bag?.vbos ?? 1) > 1 ? `Gesplitst (${a.bag?.vbos} eenheden)` : "Niet gesplitst"} conf={a.bag ? "ok" : "fail"} confTitle="BAG" source="bag" />
               <Row k="Rijksmonument" v={a.monument?.rijksmonument ? "Ja" : "Nee"} conf="ok" confTitle="RCE" />
               <Row k="Beschermd gezicht" v={a.monument?.beschermdGezicht ?? "Nee"} conf="ok" confTitle="RCE" />
               <Row k="Bestemmingsplan" v={a.bestemmingsplan?.naam ?? "—"} conf={a.bestemmingsplan ? "ok" : "fail"} confTitle="Ruimtelijkeplannen.nl" />
