@@ -177,6 +177,8 @@ async function fetchViaScraperApi(
     if (!r.ok) console.log(`[SCRAPERAPI] HTTP ${r.status} for ${targetUrl}`);
     return { html: r.ok ? html : null, debug };
   } catch (e) {
+    const err = e as Error;
+    const aborted = err.name === "AbortError";
     const debug: ScraperApiAttemptDebug = {
       scraper_url: safeApi,
       html_length: 0,
@@ -184,10 +186,12 @@ async function fetchViaScraperApi(
       first_500_chars: "",
       account_status_header: null,
       credits_remaining: null,
-      error: (e as Error).message,
+      error: aborted ? `TIMEOUT after ${opts.timeoutMs}ms (render=${opts.render})` : err.message,
     };
     buildScraperApiDebugLines(debug).forEach((line) => console.log(line));
     return { html: null, debug };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
