@@ -41,6 +41,7 @@ export interface FundaDebug {
   raw_energy_label?: string;
   energy_label_field_path?: string;
   final_energy_label?: string;
+  html_regex_results?: Record<string, string | number | null>;
   logs: string[];
 }
 
