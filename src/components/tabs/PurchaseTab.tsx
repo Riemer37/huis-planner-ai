@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { berekenBox3, berekenMaxBod, berekenRenovatiekosten, fmtEUR, fmtPct, ovbTarief } from "@/lib/calculations";
+import { berekenBox3, berekenMaxBod, berekenRenovatiekosten, fmtEUR, fmtPct, ovbTarief, maxBodBreakdown } from "@/lib/calculations";
 
 export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
   const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
