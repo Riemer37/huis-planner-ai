@@ -15,7 +15,7 @@ import {
   scrapeListing,
   synthesizeWoz,
 } from "./analyze.server";
-import type { PropertyAnalysis, PandType, ManualOverrides, Listing } from "./types";
+import type { PropertyAnalysis, PandType, Listing } from "./types";
 
 const ManualInputSchema = z
   .object({
