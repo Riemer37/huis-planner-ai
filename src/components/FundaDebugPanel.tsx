@@ -21,7 +21,7 @@ export function FundaDebugPanel({ a }: { a: PropertyAnalysis }) {
           <pre className="max-h-80 overflow-auto rounded border border-destructive/40 bg-background p-3 text-xs whitespace-pre-wrap text-foreground">{(debug.scraperapi_debug_output ?? debug.logs).join("\n")}</pre>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs tabular">
-          <Metric k="HTML length" v={debug.html_length.toLocaleString("nl-NL")} bad={debug.html_length < 50000} />
+          <Metric k="HTML length" v={debug.html_length.toLocaleString("nl-NL")} bad={debug.html_length < 100000} />
           <Metric k="NEXT_DATA" v={debug.next_data_found ? "found" : "missing"} bad={!debug.next_data_found} />
           <Metric k="Raw label" v={debug.raw_energy_label ?? "—"} />
           <Metric k="Field path" v={debug.energy_label_field_path ?? "—"} />
