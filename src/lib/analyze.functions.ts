@@ -123,7 +123,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (secondary) bronnen.push("Anthropic");
 
     // Energielabel — Funda is primair, EP-online verificatie. NOOIT raden.
-    const fundaLabel = listing?.energielabel?.toUpperCase().trim();
+    if (listing?.funda_debug?.blocked) {
+      errors.funda_blocked = "FUNDA BLOCKED — real page not returned";
+    }
+    const fundaLabelRaw = listing?.energielabel?.toUpperCase().trim();
+    const fundaLabel = listing?.funda_debug?.blocked ? undefined : fundaLabelRaw;
     const epLabel = energie?.label?.toUpperCase().trim();
     console.log(`[ENERGIELABEL] funda="${fundaLabel ?? ""}" ep_online="${epLabel ?? ""}" isUrl=${isUrl}`);
     let energielabel: PropertyAnalysis["energielabel"];
@@ -161,7 +165,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "PDOK Locatieserver", data: pdok?.adres ?? "—", status: pdok ? "ok" : "fail" },
       { naam: "BAG (Kadaster)", data: bag?.oppervlakte ? `${bag.oppervlakte} m² · ${bag.gebruiksdoel ?? "—"}` : "—", status: bag ? "ok" : "fail" },
       { naam: "EP-online energielabel", data: epLabel ?? "—", status: epLabel ? "ok" : "fail" },
-      { naam: "Funda listing", data: fundaLabel ? `Label ${fundaLabel}` : (listing?.bron === "scraperapi" ? "Geen label" : "—"), status: listing?.bron === "scraperapi" ? "ok" : (isUrl ? "fail" : "estimate") },
+      { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : (listing?.bron === "scraperapi" ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : listing?.bron === "scraperapi" ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
       { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
@@ -188,6 +192,19 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       is_apartment: isApt,
       perceel_m2: data.pandtype === "commercieel" || isApt ? undefined : 120,
       databronnen,
+      field_sources: {
+        adres: pdok ? "bag" : "schatting",
+        woonplaats: pdok ? "bag" : "schatting",
+        buurt: pdok?.buurt ? "bag" : "schatting",
+        living_area_m2: listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
+        plot_area_m2: isApt ? "bag" : "schatting",
+        build_year: (bag as any)?.bouwjaar ? "bag" : listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : "schatting",
+        rooms: listing?.kamers && !listing.funda_debug?.blocked ? "funda" : "schatting",
+        asking_price: listing?.prijs && !listing.funda_debug?.blocked ? "funda" : "schatting",
+        energy_label: fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
+        market_value: altum?.marktwaarde ? "altum_ai" : "schatting",
+        rent_value: altum?.huurwaarde ? "altum_ai" : "schatting",
+      },
     };
     return result;
   });

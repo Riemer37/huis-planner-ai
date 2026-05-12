@@ -11,9 +11,12 @@ import { PotentialTab } from "@/components/tabs/PotentialTab";
 import { PurchaseTab } from "@/components/tabs/PurchaseTab";
 import { RenovationTab } from "@/components/tabs/RenovationTab";
 import { ExitTab } from "@/components/tabs/ExitTab";
+import { ManualOverridePanel } from "@/components/ManualOverridePanel";
+import { FundaDebugPanel } from "@/components/FundaDebugPanel";
 import { analyzeProperty } from "@/lib/analyze.functions";
+import { applyManualOverrides } from "@/lib/overrides";
 import { findCached, saveAnalysis } from "@/lib/storage";
-import type { PandType, PropertyAnalysis } from "@/lib/types";
+import type { ManualOverrides, PandType, PropertyAnalysis } from "@/lib/types";
 import heroImage from "@/assets/hero-architecture.jpg";
 import { Search, Loader2 } from "lucide-react";
 
@@ -46,9 +49,17 @@ function VastgoedAI() {
   const [tab, setTab] = useState<TabId>("overzicht");
   const [error, setError] = useState<string | null>(null);
 
+  const handleManualSave = (overrides: ManualOverrides) => {
+    if (!analysis) return;
+    const updated = applyManualOverrides(analysis, overrides);
+    saveAnalysis(updated);
+    setAnalysis(updated);
+  };
+
   const handleAnalyze = async (q: string, pandtype: PandType) => {
     setError(null);
-    const cached = findCached(q);
+    const isUrl = /^https?:\/\//i.test(q);
+    const cached = isUrl ? undefined : findCached(q);
     if (cached && cached.pandtype === pandtype) {
       setAnalysis(cached);
       return;
@@ -56,7 +67,6 @@ function VastgoedAI() {
     setLoading(true);
     setStages(["PDOK locatie ophalen…", "BAG verblijfsobject…", "Monumenten-check…", "AI-analyse…"]);
     try {
-      const isUrl = /^https?:\/\//i.test(q);
       const result = (await analyze({ data: { query: q, pandtype, isUrl } })) as PropertyAnalysis;
       saveAnalysis(result);
       setAnalysis(result);
@@ -105,6 +115,10 @@ function VastgoedAI() {
               {tab === "aankoop" && <PurchaseTab a={analysis} />}
               {tab === "renovatie" && <RenovationTab a={analysis} />}
               {tab === "exit" && <ExitTab a={analysis} />}
+              <div className="mt-6 space-y-4">
+                <ManualOverridePanel a={analysis} onSave={handleManualSave} />
+                <FundaDebugPanel a={analysis} />
+              </div>
             </div>
           </>
         )}

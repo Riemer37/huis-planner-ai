@@ -126,29 +126,30 @@ export async function scrapeListing(targetUrl: string) {
   }
 }
 
-// Recursively zoek een veld dat lijkt op een energielabel sleutel
-function deepFindEnergyLabel(obj: any, depth = 0): string | undefined {
-  if (!obj || depth > 8) return undefined;
-  if (typeof obj !== "object") return undefined;
-  for (const [k, v] of Object.entries(obj)) {
-    const key = k.toLowerCase();
-    if (
-      (key === "energylabel" || key === "energielabel" || key === "energy_label" || key === "label" && /energ/i.test(JSON.stringify(obj).slice(0, 200)))
-    ) {
-      if (typeof v === "string" && /^[A-G](\+{1,4})?$/i.test(v.trim())) return v.trim().toUpperCase();
-      if (v && typeof v === "object") {
-        const inner = (v as any).label ?? (v as any).value ?? (v as any).code ?? (v as any).name;
-        if (typeof inner === "string" && /^[A-G](\+{1,4})?$/i.test(inner.trim())) return inner.trim().toUpperCase();
+function isEnergyLabelValue(value: unknown): value is string {
+  return typeof value === "string" && /^(A\+{0,4}|[B-G])$/i.test(value.trim());
+}
+
+function findEnergyLabelCandidates(obj: any, path: string[] = [], depth = 0): { value: string; path: string; score: number }[] {
+  if (!obj || typeof obj !== "object" || depth > 12) return [];
+  const candidates: { value: string; path: string; score: number }[] = [];
+  for (const [key, value] of Object.entries(obj)) {
+    const nextPath = [...path, key];
+    const pathText = nextPath.join(".").toLowerCase();
+    const keyText = key.toLowerCase();
+    const energyContext = /(energy|energie|energielabel|energieklasse|labelletter)/i.test(pathText);
+    const exactEnergyKey = /^(energylabel|energielabel|energy_label|energie_label|energieklasse|labelletter)$/i.test(keyText);
+    if (isEnergyLabelValue(value) && (energyContext || exactEnergyKey)) {
+      candidates.push({ value: value.trim().toUpperCase(), path: nextPath.join("."), score: exactEnergyKey ? 100 : 70 });
+    } else if (value && typeof value === "object" && (energyContext || exactEnergyKey)) {
+      const inner = (value as any).label ?? (value as any).value ?? (value as any).code ?? (value as any).name ?? (value as any).text;
+      if (isEnergyLabelValue(inner)) {
+        candidates.push({ value: inner.trim().toUpperCase(), path: `${nextPath.join(".")}.${["label", "value", "code", "name", "text"].find((k) => (value as any)[k] === inner) ?? "value"}`, score: exactEnergyKey ? 95 : 75 });
       }
     }
+    if (value && typeof value === "object") candidates.push(...findEnergyLabelCandidates(value, nextPath, depth + 1));
   }
-  for (const v of Object.values(obj)) {
-    if (v && typeof v === "object") {
-      const r = deepFindEnergyLabel(v, depth + 1);
-      if (r) return r;
-    }
-  }
-  return undefined;
+  return candidates.sort((a, b) => b.score - a.score || a.path.length - b.path.length);
 }
 
 function normalizeLabel(s?: string): string | undefined {
@@ -170,16 +171,30 @@ function parseListingHtml(html: string, url: string) {
 
   let prijs: number | undefined, m2: number | undefined, kamers: number | undefined, bouwjaar: number | undefined, adres: string | undefined, label: string | undefined, beschrijving: string | undefined;
   let labelSource: string = "none";
+  let rawNextData: any;
+  let rawEnergyLabel: string | undefined;
+  let fieldPath: string | undefined;
+  const htmlLength = html.length;
+  const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  const nextDataFound = !!nextData;
+  const blocked = htmlLength < 50000 || !nextDataFound;
+
+  console.log("Raw HTML length:", htmlLength);
+  console.log("NEXT_DATA found:", nextDataFound);
+  if (blocked) console.log("FUNDA BLOCKED — real page not returned");
 
   // 1) Funda __NEXT_DATA__ — primaire bron
-  const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
   if (nextData) {
     try {
       const json = JSON.parse(nextData[1]);
-      const found = deepFindEnergyLabel(json);
-      console.log("[FUNDA] __NEXT_DATA__ deepFind energielabel:", found);
-      if (found) {
-        label = normalizeLabel(found);
+      rawNextData = json;
+      const candidates = findEnergyLabelCandidates(json);
+      const found = candidates[0];
+      rawEnergyLabel = found?.value;
+      fieldPath = found?.path;
+      console.log("[FUNDA] __NEXT_DATA__ energy label candidates:", candidates.slice(0, 10));
+      if (found?.value) {
+        label = normalizeLabel(found.value);
         labelSource = "funda_next_data";
       }
       // probeer ook adres/m2/prijs/bouwjaar uit next data
@@ -215,6 +230,8 @@ function parseListingHtml(html: string, url: string) {
       ?? html.match(/Energielabel[\s\S]{0,200}?>\s*([A-G]\+{0,4})\s*</i);
     if (dt) {
       label = normalizeLabel(dt[1]);
+      rawEnergyLabel = rawEnergyLabel ?? dt[1];
+      fieldPath = fieldPath ?? "html.Energielabel";
       labelSource = "funda_html";
       console.log("[FUNDA] HTML-fallback energielabel:", label);
     }
@@ -224,6 +241,9 @@ function parseListingHtml(html: string, url: string) {
   m2 = m2 ?? num(pick(/(\d{2,4})\s*m²/));
   bouwjaar = bouwjaar ?? num(pick(/Bouwjaar[^<]*<[^>]*>\s*(\d{4})/i)) ?? num(pick(/(\d{4})\s*<\/[^>]+>\s*<[^>]+>\s*Bouwjaar/i));
 
+  console.log("Energy label raw value:", rawEnergyLabel ?? null);
+  console.log("Energy label field path used:", fieldPath ?? null);
+  console.log("Final energy label returned:", label ?? null);
   console.log(`[FUNDA] FINAL energielabel="${label ?? "(none)"}" source=${labelSource} url=${url}`);
 
   return {
@@ -237,6 +257,23 @@ function parseListingHtml(html: string, url: string) {
     adres,
     beschrijving,
     bron: "scraperapi" as const,
+    funda_debug: {
+      html_length: htmlLength,
+      next_data_found: nextDataFound,
+      blocked,
+      raw_next_data: rawNextData,
+      raw_energy_label: rawEnergyLabel,
+      energy_label_field_path: fieldPath,
+      final_energy_label: label,
+      logs: [
+        `Raw HTML length: ${htmlLength}`,
+        `NEXT_DATA found: ${nextDataFound}`,
+        `Energy label raw value: ${rawEnergyLabel ?? "null"}`,
+        `Energy label field path used: ${fieldPath ?? "null"}`,
+        `Final energy label returned: ${label ?? "null"}`,
+        ...(blocked ? ["FUNDA BLOCKED — real page not returned"] : []),
+      ],
+    },
   };
 }
 

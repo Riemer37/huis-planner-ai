@@ -16,6 +16,31 @@ export interface Listing {
   erfpacht?: boolean;
   beschrijving?: string;
   bron?: "scraperapi" | "manual";
+  funda_debug?: FundaDebug;
+}
+
+export type DataSource = "funda" | "ep_online" | "altum_ai" | "bag" | "handmatig" | "schatting";
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+export interface FundaDebug {
+  html_length: number;
+  next_data_found: boolean;
+  blocked: boolean;
+  raw_next_data?: JsonValue;
+  raw_energy_label?: string;
+  energy_label_field_path?: string;
+  final_energy_label?: string;
+  logs: string[];
+}
+
+export interface ManualOverrides {
+  energielabel?: string;
+  living_area_m2?: number;
+  plot_area_m2?: number;
+  plot_not_applicable?: boolean;
+  asking_price?: number;
+  rooms?: number;
+  build_year?: number;
 }
 
 export interface PdokResult {
@@ -75,6 +100,8 @@ export interface PropertyAnalysis {
   };
   is_apartment?: boolean;
   databronnen?: { naam: string; data: string; status: "ok" | "fail" | "estimate" }[];
+  field_sources?: Record<string, DataSource>;
+  manual_overrides?: ManualOverrides;
   monument?: { rijksmonument: boolean; beschermdGezicht?: string | null };
   perceel_m2?: number;
   bestemmingsplan?: { naam?: string; status?: string };
