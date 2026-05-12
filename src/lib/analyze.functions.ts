@@ -122,9 +122,10 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (primary) bronnen.push("Lovable AI");
     if (secondary) bronnen.push("Anthropic");
 
-    // Energielabel-conflict detectie (Funda primair, EP-online verificatie)
+    // Energielabel — Funda is primair, EP-online verificatie. NOOIT raden.
     const fundaLabel = listing?.energielabel?.toUpperCase().trim();
     const epLabel = energie?.label?.toUpperCase().trim();
+    console.log(`[ENERGIELABEL] funda="${fundaLabel ?? ""}" ep_online="${epLabel ?? ""}" isUrl=${isUrl}`);
     let energielabel: PropertyAnalysis["energielabel"];
     if (fundaLabel && epLabel) {
       const conflict = fundaLabel !== epLabel;
@@ -140,8 +141,10 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     } else if (epLabel) {
       energielabel = { label: epLabel, bron: "EP-online" };
     } else {
-      energielabel = { label: primary.pandtype_bevestiging === "nieuwbouw" ? "A" : "C", bron: "AI-schatting" };
+      // Niet raden — toon Onbekend met duidelijke bron-indicatie
+      energielabel = { label: "Onbekend", bron: isUrl ? "Niet gevonden in listing" : "Niet beschikbaar" };
     }
+    console.log(`[ENERGIELABEL] FINAL label="${energielabel.label}" bron="${energielabel.bron}"`);
 
     // Apartment-detectie — perceel hoort dan niet bij de unit
     const txt = `${listing?.beschrijving ?? ""} ${listing?.adres ?? ""} ${pdok?.adres ?? ""}`;
