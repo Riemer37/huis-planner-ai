@@ -14,6 +14,9 @@ import { ExitTab } from "@/components/tabs/ExitTab";
 import { analyzeProperty } from "@/lib/analyze.functions";
 import { findCached, saveAnalysis } from "@/lib/storage";
 import type { PandType, PropertyAnalysis } from "@/lib/types";
+import heroImage from "@/assets/hero-architecture.jpg";
+import { useState as _useState } from "react";
+import { Search, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: VastgoedAI,
