@@ -11,7 +11,7 @@ export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
   const [taxatie, setTaxatie] = useState(700);
   const [keuring, setKeuring] = useState(550);
   const [overig, setOverig] = useState(2500);
-  const [roi, setRoi] = useState(5);
+  const [roi, setRoi] = useState(10);
   const [hypotheek, setHypotheek] = useState(0);
   const [partners, setPartners] = useState(false);
 
