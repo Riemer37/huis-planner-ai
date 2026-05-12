@@ -39,6 +39,165 @@ export async function fetchBagVbo(bagId: string | undefined) {
   }
 }
 
+// ---------- Official BAG API (Kadaster) — fallback when WFS faalt ----------
+export async function fetchBagApi(bagId: string | undefined) {
+  if (!bagId) return null;
+  const key = process.env.BAG_API_KEY;
+  if (!key) return null;
+  try {
+    const url = `https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adresseerbareobjecten/${bagId}`;
+    const r = await fetch(url, {
+      headers: { "X-Api-Key": key, "Accept-Crs": "epsg:28992", Accept: "application/hal+json" },
+    });
+    if (!r.ok) return null;
+    const j: any = await r.json();
+    const v = j?.verblijfsobject?.verblijfsobject ?? j?._embedded?.adresseerbareObjecten?.[0]?.verblijfsobject?.verblijfsobject;
+    if (!v) return null;
+    return {
+      oppervlakte: v.oppervlakte ? Number(v.oppervlakte) : undefined,
+      gebruiksdoel: Array.isArray(v.gebruiksdoelen) ? v.gebruiksdoelen.join(", ") : undefined,
+      status: v.status,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------- EP Online — energielabel ----------
+export async function fetchEnergielabel(postcode?: string, huisnummer?: string) {
+  const key = process.env.EP_ONLINE_API_KEY;
+  if (!key || !postcode || !huisnummer) return null;
+  try {
+    const pc = postcode.replace(/\s+/g, "").toUpperCase();
+    const url = `https://public.ep-online.nl/api/v5/PandEnergielabel/AdresseerbaarObject/${encodeURIComponent(pc)}/${encodeURIComponent(huisnummer)}`;
+    const r = await fetch(url, { headers: { Authorization: key, Accept: "application/json" } });
+    if (!r.ok) return null;
+    const j: any = await r.json();
+    const item = Array.isArray(j) ? j[0] : j;
+    if (!item) return null;
+    return {
+      label: String(item.labelLetter ?? item.energieklasse ?? "?"),
+      bron: "ep_online" as const,
+      registratiedatum: item.registratiedatum ?? item.opnameDatum,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Altum AI — WOZ-waarde / waarde-indicatie ----------
+export async function fetchAltum(postcode?: string, huisnummer?: string) {
+  const key = process.env.ALTUM_AI_API_KEY;
+  if (!key || !postcode || !huisnummer) return null;
+  try {
+    const pc = postcode.replace(/\s+/g, "").toUpperCase();
+    // Match endpoint accepteert post_code + house_number
+    const r = await fetch("https://api.altum.ai/avm", {
+      method: "POST",
+      headers: { "x-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ post_code: pc, house_number: Number(huisnummer) }),
+    });
+    if (!r.ok) return null;
+    const j: any = await r.json();
+    const d = j?.Output ?? j?.data ?? j;
+    return {
+      bron: "altum_ai" as const,
+      marktwaarde: d?.AVM ?? d?.market_value ?? d?.value ?? undefined,
+      woz_geschat: d?.WOZ ?? d?.woz_value ?? undefined,
+      huurwaarde: d?.RentalValue ?? d?.rent ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------- ScraperAPI — Funda / Pararius listing ----------
+export async function scrapeListing(targetUrl: string) {
+  const key = process.env.SCRAPER_API_KEY;
+  if (!key) return null;
+  try {
+    const api = `http://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&country_code=nl&render=false`;
+    const r = await fetch(api);
+    if (!r.ok) return null;
+    const html = await r.text();
+    return parseListingHtml(html, targetUrl);
+  } catch {
+    return null;
+  }
+}
+
+function parseListingHtml(html: string, url: string) {
+  const pick = (re: RegExp) => {
+    const m = html.match(re);
+    return m?.[1]?.trim();
+  };
+  const num = (s?: string) => {
+    if (!s) return undefined;
+    const cleaned = s.replace(/[^\d]/g, "");
+    return cleaned ? Number(cleaned) : undefined;
+  };
+  // Try JSON-LD first (Funda/Pararius beide gebruiken schema.org)
+  const ld = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+  let prijs: number | undefined, m2: number | undefined, kamers: number | undefined, bouwjaar: number | undefined, adres: string | undefined, label: string | undefined;
+  if (ld) {
+    try {
+      const data = JSON.parse(ld[1]);
+      const node = Array.isArray(data) ? data[0] : data;
+      prijs = node?.offers?.price ? Number(node.offers.price) : undefined;
+      adres = node?.address?.streetAddress;
+      m2 = node?.floorSize?.value ? Number(node.floorSize.value) : undefined;
+      kamers = node?.numberOfRooms ? Number(node.numberOfRooms) : undefined;
+    } catch {}
+  }
+  prijs = prijs ?? num(pick(/€\s*([\d\.\s]+)\s*(?:k\.k\.|v\.o\.n\.)?/i));
+  m2 = m2 ?? num(pick(/(\d{2,4})\s*m²/));
+  bouwjaar = num(pick(/Bouwjaar[^<]*<[^>]*>\s*(\d{4})/i)) ?? num(pick(/(\d{4})\s*<\/[^>]+>\s*<[^>]+>\s*Bouwjaar/i));
+  label = pick(/Energielabel[^A-G]*([A-G]\+{0,4})/i);
+  return {
+    url,
+    prijs,
+    vraagprijs: prijs,
+    m2,
+    kamers,
+    bouwjaar,
+    energielabel: label,
+    adres,
+    bron: "scraperapi" as const,
+  };
+}
+
+// ---------- Anthropic — secundaire AI cross-check ----------
+export async function callAnthropic(prompt: string) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 600,
+        system:
+          "Je bent een Nederlandse vastgoedanalist. Geef een korte second opinion (max 120 woorden) met advies (Kopen/Voorwaardelijk/Vermijden) en score 1-10. Antwoord als JSON: {\"samenvatting\":\"...\",\"advies\":\"...\",\"score\":N}.",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!r.ok) return null;
+    const j: any = await r.json();
+    const text = j?.content?.[0]?.text ?? "";
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return { bron: "anthropic" as const, samenvatting: text.slice(0, 400) };
+    const parsed = JSON.parse(m[0]);
+    return { bron: "anthropic" as const, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchRijksmonument(lat?: number, lon?: number) {
   if (!lat || !lon) return { rijksmonument: false, beschermdGezicht: null };
   try {
@@ -181,6 +340,9 @@ Pandtype (door gebruiker geselecteerd): ${ctx.pandtype}
 PDOK locatie: ${JSON.stringify(ctx.pdok ?? "onbekend")}
 BAG verblijfsobject: ${JSON.stringify(ctx.bag ?? "onbekend")}
 Monument/beschermd gezicht: ${JSON.stringify(ctx.monument)}
+Listing (ScraperAPI): ${JSON.stringify(ctx.listing ?? "onbekend")}
+Energielabel (EP Online): ${JSON.stringify(ctx.energie ?? "onbekend")}
+Altum AI waarderef: ${JSON.stringify(ctx.altum ?? "onbekend")}
 
 Instructies:
 - score 1-10 (10 = uitstekende belegging).

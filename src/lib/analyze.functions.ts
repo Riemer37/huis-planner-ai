@@ -1,6 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { buildPrompt, callLovableAI, cryptoRandomId, fallbackAI, fetchBagVbo, fetchPdok, fetchRijksmonument, synthesizeWoz } from "./analyze.server";
+import {
+  buildPrompt,
+  callAnthropic,
+  callLovableAI,
+  cryptoRandomId,
+  fallbackAI,
+  fetchAltum,
+  fetchBagApi,
+  fetchBagVbo,
+  fetchEnergielabel,
+  fetchPdok,
+  fetchRijksmonument,
+  scrapeListing,
+  synthesizeWoz,
+} from "./analyze.server";
 import type { PropertyAnalysis, PandType } from "./types";
 
 const InputSchema = z.object({
@@ -9,23 +23,35 @@ const InputSchema = z.object({
   isUrl: z.boolean().optional(),
 });
 
+function extractHuisnummer(adres?: string): string | undefined {
+  if (!adres) return undefined;
+  const m = adres.match(/\b(\d+)([a-zA-Z]?)\b/);
+  return m ? m[1] : undefined;
+}
+
 export const analyzeProperty = createServerFn({ method: "POST" })
   .inputValidator((i) => InputSchema.parse(i))
   .handler(async ({ data }): Promise<PropertyAnalysis> => {
     const errors: Record<string, string> = {};
+    const bronnen: string[] = ["PDOK"];
     const isUrl = data.isUrl ?? /^https?:\/\//i.test(data.query);
 
-    // Address detection: if URL, try a naive extraction; else treat as address
-    let addressForPdok = data.query;
+    // Stap 0: ScraperAPI als URL
     let listing: PropertyAnalysis["listing"] = undefined;
+    let addressForPdok = data.query;
     if (isUrl) {
-      // Listing scraping is best-effort and likely blocked; we let AI work from URL+address
-      listing = { url: data.query };
-      // Try to pull human-readable address from path
-      const m = data.query.match(/\/([a-z0-9\-]+)\/(huis|appartement|object)\-([0-9]+)/i);
-      if (m) {
-        const slug = m[1].replace(/\-/g, " ");
-        addressForPdok = slug;
+      const scraped = await scrapeListing(data.query).catch((e: any) => {
+        errors.scraper = String(e?.message ?? e);
+        return null;
+      });
+      if (scraped) {
+        listing = scraped;
+        bronnen.push("ScraperAPI");
+        if (scraped.adres) addressForPdok = scraped.adres;
+      } else {
+        listing = { url: data.query, bron: "manual" };
+        const m = data.query.match(/\/([a-z0-9\-]+)\/(huis|appartement|object)\-([0-9]+)/i);
+        if (m) addressForPdok = m[1].replace(/\-/g, " ");
       }
     }
 
@@ -39,35 +65,62 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       errors.pdok = e.message;
     }
 
-    // Fase 2: parallel
-    const [bag, monument] = await Promise.all([
-      fetchBagVbo(pdok?.bagId).catch((e) => {
-        errors.bag = String(e?.message ?? e);
+    const huisnummer = extractHuisnummer(pdok?.adres) ?? extractHuisnummer(addressForPdok);
+
+    // Fase 2: parallelle data-ophaal
+    const [bagWfs, bagApi, monument, energie, altum] = await Promise.all([
+      fetchBagVbo(pdok?.bagId).catch((e: any) => {
+        errors.bag_wfs = String(e?.message ?? e);
         return null;
       }),
-      fetchRijksmonument(pdok?.lat, pdok?.lon).catch((e) => {
+      fetchBagApi(pdok?.bagId).catch((e: any) => {
+        errors.bag_api = String(e?.message ?? e);
+        return null;
+      }),
+      fetchRijksmonument(pdok?.lat, pdok?.lon).catch((e: any) => {
         errors.monument = String(e?.message ?? e);
         return { rijksmonument: false, beschermdGezicht: null };
       }),
+      fetchEnergielabel(pdok?.postcode, huisnummer).catch((e: any) => {
+        errors.ep_online = String(e?.message ?? e);
+        return null;
+      }),
+      fetchAltum(pdok?.postcode, huisnummer).catch((e: any) => {
+        errors.altum = String(e?.message ?? e);
+        return null;
+      }),
     ]);
 
-    // AI prompt
+    const bag = bagApi ?? bagWfs;
+    if (bagApi) bronnen.push("BAG API");
+    else if (bagWfs) bronnen.push("BAG WFS");
+    if (monument?.rijksmonument) bronnen.push("RCE Monumenten");
+    if (energie) bronnen.push("EP Online");
+    if (altum) bronnen.push("Altum AI");
+
+    // Fase 3: AI primair (Lovable) + secundair (Anthropic) parallel
     const prompt = buildPrompt({
       query: data.query,
       pandtype: data.pandtype,
       pdok,
       bag,
       monument,
+      listing,
+      altum,
+      energie,
       isUrl,
     });
 
-    let ai;
-    try {
-      ai = await callLovableAI(prompt);
-    } catch (e: any) {
-      errors.ai = e.message;
-      ai = fallbackAI(data.pandtype);
-    }
+    const [primary, secondary] = await Promise.all([
+      callLovableAI(prompt).catch((e: any) => {
+        errors.ai = e.message;
+        return fallbackAI(data.pandtype);
+      }),
+      callAnthropic(prompt).catch(() => null),
+    ]);
+
+    if (primary) bronnen.push("Lovable AI");
+    if (secondary) bronnen.push("Anthropic");
 
     const result: PropertyAnalysis = {
       id: cryptoRandomId(),
@@ -78,11 +131,17 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       pdok: pdok ?? { adres: data.query },
       bag: bag ?? undefined,
       monument: monument ?? { rijksmonument: false, beschermdGezicht: null },
-      ai,
+      ai: primary,
+      ai_secondary: secondary ?? undefined,
+      altum: altum ?? null,
       errors,
-      // Synthesized WOZ series (best-effort fallback) — Kadaster WOZ requires auth in many cases
-      woz: synthesizeWoz(ai.marktwaarde_ai),
-      energielabel: { label: ai.pandtype_bevestiging === "nieuwbouw" ? "A" : "C", bron: "schatting" },
+      bronnen,
+      woz: altum?.woz_geschat
+        ? synthesizeWoz(altum.woz_geschat * 1.1)
+        : synthesizeWoz(primary.marktwaarde_ai),
+      energielabel: energie
+        ? { label: energie.label, bron: energie.bron }
+        : { label: primary.pandtype_bevestiging === "nieuwbouw" ? "A" : "C", bron: "schatting" },
       perceel_m2: data.pandtype === "commercieel" ? undefined : 120,
     };
     return result;
