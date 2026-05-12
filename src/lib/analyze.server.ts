@@ -1,3 +1,5 @@
+import type { Listing } from "./types";
+
 // Helpers used only on server
 export async function fetchPdok(query: string) {
   const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(query)}&fl=id,weergavenaam,centroide_ll,woonplaatsnaam,gemeentenaam,buurtnaam,postcode,straatnaam,huisnummer,adresseerbaarobject_id,nummeraanduiding_id&rows=1`;
@@ -182,7 +184,7 @@ async function fetchViaScraperApi(key: string, targetUrl: string): Promise<Scrap
   }
 }
 
-export async function scrapeListing(targetUrl: string) {
+export async function scrapeListing(targetUrl: string): Promise<Listing | null> {
   const key = process.env.SCRAPER_API_KEY;
   if (!key) return null;
   try {
@@ -260,7 +262,7 @@ function normalizeLabel(s?: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
-function parseListingHtml(html: string, url: string) {
+function parseListingHtml(html: string, url: string): Listing {
   const pick = (re: RegExp) => {
     const m = html.match(re);
     return m?.[1]?.trim();
