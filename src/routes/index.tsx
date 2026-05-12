@@ -45,11 +45,14 @@ type TabId = (typeof TABS)[number]["id"];
 
 function VastgoedAI() {
   const analyze = useServerFn(analyzeProperty);
+  const prefetch = useServerFn(prefetchProperty);
   const [analysis, setAnalysis] = useState<PropertyAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [stages, setStages] = useState<string[]>([]);
   const [tab, setTab] = useState<TabId>("overzicht");
   const [error, setError] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<PrefillResult | null>(null);
+  const [pendingPandtype, setPendingPandtype] = useState<PandType>("woning");
 
   const handleManualSave = (overrides: ManualOverrides) => {
     if (!analysis) return;
@@ -60,18 +63,46 @@ function VastgoedAI() {
 
   const handleAnalyze = async (q: string, pandtype: PandType) => {
     setError(null);
+    setAnalysis(null);
+    setPrefill(null);
     const isUrl = /^https?:\/\//i.test(q);
-    const cached = isUrl ? undefined : findCached(q);
-    if (cached && cached.pandtype === pandtype) {
-      setAnalysis(cached);
-      return;
+    if (!isUrl) {
+      const cached = findCached(q);
+      if (cached && cached.pandtype === pandtype) {
+        setAnalysis(cached);
+        return;
+      }
     }
     setLoading(true);
-    setStages(["PDOK locatie ophalen…", "BAG verblijfsobject…", "Monumenten-check…", "AI-analyse…"]);
+    setPendingPandtype(pandtype);
+    setStages(["PDOK locatie ophalen…", "BAG verblijfsobject…", "EP-online energielabel…", "Funda (best-effort)…"]);
     try {
-      const result = (await analyze({ data: { query: q, pandtype, isUrl } })) as PropertyAnalysis;
+      const pre = (await prefetch({ data: { query: q, isUrl } })) as PrefillResult;
+      setPrefill(pre);
+    } catch (e: any) {
+      setError(e?.message ?? "Pre-fetch mislukt");
+    } finally {
+      setLoading(false);
+      setStages([]);
+    }
+  };
+
+  const handleStartAnalysis = async (manualInput: ManualOverrides) => {
+    if (!prefill) return;
+    setLoading(true);
+    setStages(["AI-analyse loopt…"]);
+    try {
+      const result = (await analyze({
+        data: {
+          query: prefill.query,
+          pandtype: pendingPandtype,
+          isUrl: prefill.isUrl,
+          manualInput,
+        },
+      })) as PropertyAnalysis;
       saveAnalysis(result);
       setAnalysis(result);
+      setPrefill(null);
       setTab("overzicht");
     } catch (e: any) {
       setError(e?.message ?? "Analyse mislukt");
