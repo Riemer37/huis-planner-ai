@@ -149,7 +149,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const gd = (bag?.gebruiksdoel ?? "").toLowerCase();
     const isApt =
       data.pandtype !== "commercieel" &&
-      ((bag?.vbos ?? 0) > 1 ||
+      (((bag as any)?.vbos ?? 0) > 1 ||
         aptKeywords.test(txt) ||
         (gd.includes("woonfunctie") && (bag?.oppervlakte ?? 999) < 110 && !listing?.m2));
 
