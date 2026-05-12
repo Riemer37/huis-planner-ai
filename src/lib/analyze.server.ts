@@ -205,7 +205,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     scraperAttempts.push(fetched.debug);
     let html = fetched.html;
     let attempts = 1;
-    const isBlocked = (h: string | null) => !h || h.length < 100000 || !h.includes("__NEXT_DATA__");
+    const isBlocked = (h: string | null) => !h || h.length < 50000;
     if (isBlocked(html)) {
       // Attempt 2: render=true (slower, ~15-20s) with bounded timeout so the function never hangs.
       console.log(`[SCRAPERAPI] Attempt 1 (render=false) blocked (len=${html?.length ?? 0}). Retrying with render=true.`);
