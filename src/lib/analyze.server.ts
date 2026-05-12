@@ -171,16 +171,30 @@ function parseListingHtml(html: string, url: string) {
 
   let prijs: number | undefined, m2: number | undefined, kamers: number | undefined, bouwjaar: number | undefined, adres: string | undefined, label: string | undefined, beschrijving: string | undefined;
   let labelSource: string = "none";
+  let rawNextData: any;
+  let rawEnergyLabel: string | undefined;
+  let fieldPath: string | undefined;
+  const htmlLength = html.length;
+  const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  const nextDataFound = !!nextData;
+  const blocked = htmlLength < 50000 || !nextDataFound;
+
+  console.log("Raw HTML length:", htmlLength);
+  console.log("NEXT_DATA found:", nextDataFound);
+  if (blocked) console.log("FUNDA BLOCKED — real page not returned");
 
   // 1) Funda __NEXT_DATA__ — primaire bron
-  const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
   if (nextData) {
     try {
       const json = JSON.parse(nextData[1]);
-      const found = deepFindEnergyLabel(json);
-      console.log("[FUNDA] __NEXT_DATA__ deepFind energielabel:", found);
-      if (found) {
-        label = normalizeLabel(found);
+      rawNextData = json;
+      const candidates = findEnergyLabelCandidates(json);
+      const found = candidates[0];
+      rawEnergyLabel = found?.value;
+      fieldPath = found?.path;
+      console.log("[FUNDA] __NEXT_DATA__ energy label candidates:", candidates.slice(0, 10));
+      if (found?.value) {
+        label = normalizeLabel(found.value);
         labelSource = "funda_next_data";
       }
       // probeer ook adres/m2/prijs/bouwjaar uit next data
