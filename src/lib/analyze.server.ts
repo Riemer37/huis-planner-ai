@@ -143,12 +143,19 @@ function buildScraperApiDebugLines(debug: ScraperApiAttemptDebug) {
   ];
 }
 
-async function fetchViaScraperApi(key: string, targetUrl: string): Promise<ScraperApiFetchResult> {
+async function fetchViaScraperApi(
+  key: string,
+  targetUrl: string,
+  opts: { render: boolean; timeoutMs: number },
+): Promise<ScraperApiFetchResult> {
   const encoded = encodeURIComponent(targetUrl);
-  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
+  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=${opts.render}&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
   const safeApi = api.replace(key, "[REDACTED_SCRAPER_API_KEY]");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
   try {
     const r = await fetch(api, {
+      signal: controller.signal,
       headers: {
         "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
         "X-MyHeader-Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
