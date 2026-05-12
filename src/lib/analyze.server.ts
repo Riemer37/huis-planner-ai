@@ -196,6 +196,9 @@ export async function callAnthropic(prompt: string) {
   } catch {
     return null;
   }
+}
+
+export async function fetchRijksmonument(lat?: number, lon?: number) {
   if (!lat || !lon) return { rijksmonument: false, beschermdGezicht: null };
   try {
     const d = 0.0002;
