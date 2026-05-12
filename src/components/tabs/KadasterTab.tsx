@@ -90,10 +90,18 @@ export function KadasterTab({ a }: { a: PropertyAnalysis }) {
           <div className="bg-card border rounded-lg p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Energielabel</div>
-              <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-                <ConfDot level={a.energielabel?.bron === "Funda listing" || a.energielabel?.bron === "EP-online" ? "ok" : "estimate"} title="Bron" />
-                Bron: {a.energielabel?.bron ?? "—"}
-              </span>
+              {(() => {
+                const bron = a.energielabel?.bron ?? "—";
+                const isVerified = bron === "Funda listing" || bron === "EP-online";
+                const isUnknown = (a.energielabel?.label ?? "").toLowerCase() === "onbekend" || !a.energielabel?.label;
+                const cls = isVerified ? "text-positive" : isUnknown ? "text-destructive" : "text-warning";
+                return (
+                  <span className={`text-[11px] font-medium inline-flex items-center gap-1.5 ${cls}`}>
+                    <ConfDot level={isVerified ? "ok" : isUnknown ? "fail" : "estimate"} title="Bron" />
+                    {isUnknown ? "Onbekend — handmatig controleren" : `${a.energielabel?.label} — Bron: ${bron}`}
+                  </span>
+                );
+              })()}
             </div>
             <div className="grid grid-cols-10 gap-1">
               {labels.map((l) => {
