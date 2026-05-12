@@ -23,8 +23,8 @@ export function Warnings({ a }: { a: PropertyAnalysis }) {
             it.level === "danger"
               ? "bg-destructive/10 border-destructive/30 text-destructive"
               : it.level === "warn"
-                ? "bg-warning/10 border-warning/30 text-warning-foreground"
-                : "bg-accent border-border"
+                ? "bg-warning/10 border-warning/30 text-warning"
+                : "bg-card border-border text-foreground/80"
           }`}
         >
           <AlertTriangle className="size-4 shrink-0 mt-0.5" />

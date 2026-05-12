@@ -68,7 +68,7 @@ function VastgoedAI() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-background text-foreground">
       <Sidebar onAnalyze={handleAnalyze} onSelectHistory={(a) => { setAnalysis(a); setTab("overzicht"); }} loading={loading} loadingStages={stages} current={analysis} />
 
       <main className="flex-1 min-w-0 flex flex-col">
@@ -79,14 +79,16 @@ function VastgoedAI() {
             <PropertyHeader a={analysis} />
             <KpiStrip a={analysis} />
             <Warnings a={analysis} />
-            <div className="px-6 border-b">
+            <div className="px-6 border-b border-border bg-card/30">
               <div className="flex gap-1 overflow-x-auto">
                 {TABS.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setTab(t.id)}
-                    className={`px-4 py-2.5 text-sm border-b-2 transition whitespace-nowrap ${
-                      tab === t.id ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+                    className={`px-4 py-3 text-sm border-b-2 transition whitespace-nowrap uppercase tracking-wider text-[12px] ${
+                      tab === t.id
+                        ? "border-primary text-foreground font-bold"
+                        : "border-transparent text-muted-foreground hover:text-foreground/90"
                     }`}
                   >
                     {t.label}
@@ -111,18 +113,40 @@ function VastgoedAI() {
 
 function EmptyState({ error, loading }: { error: string | null; loading: boolean }) {
   return (
-    <div className="flex-1 flex items-center justify-center p-10">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold mb-2">VastgoedAI</h1>
-        <p className="text-sm text-muted-foreground mb-6">
-          Plak een Funda/Pararius/Vendr URL of voer een adres in. Selecteer pandtype en klik Analyseer.
+    <div className="flex-1 flex items-center justify-center p-10 relative overflow-hidden">
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.07]"
+        style={{ backgroundImage: "radial-gradient(circle at 50% 30%, var(--primary), transparent 55%)" }}
+      />
+      <div className="relative max-w-xl text-center">
+        <div className="label-eyebrow mb-3">Nederlandse Vastgoed Investment Terminal</div>
+        <h1 className="display text-5xl font-extrabold tracking-tight mb-3">
+          Vastgoed<span className="text-gold text-shadow-gold">AI</span>
+        </h1>
+        <p className="text-sm text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">
+          Institutional-grade beleggingsanalyse op elk Nederlands adres. Plak een Funda/Pararius URL of voer een adres in en krijg
+          binnen seconden marktwaarde, max bod, risico en rendement.
         </p>
-        {loading && <p className="text-sm">Bezig met data ophalen…</p>}
-        {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded p-3">{error}</p>}
-        <div className="mt-8 text-xs text-muted-foreground space-y-1">
-          <div>• PDOK Locatieserver, BAG, RCE monumenten</div>
-          <div>• AI-analyse via Lovable AI Gateway</div>
-          <div>• Lokale cache 24u (max 30 entries)</div>
+        {loading && (
+          <p className="text-sm text-gold">
+            <span className="inline-block size-2 rounded-full bg-primary animate-pulse mr-2 align-middle" />
+            Bezig met data ophalen…
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-3">{error}</p>
+        )}
+        <div className="mt-10 grid grid-cols-3 gap-3 text-[11px]">
+          {[
+            { k: "PDOK · BAG · RCE", v: "Officiële databronnen" },
+            { k: "Lovable AI Gateway", v: "Real-time analyse" },
+            { k: "Lokale cache 24u", v: "30 analyses" },
+          ].map((c) => (
+            <div key={c.k} className="panel gold-top p-3 text-left lift">
+              <div className="label-eyebrow">{c.k}</div>
+              <div className="text-foreground/90 mt-1">{c.v}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
