@@ -126,6 +126,37 @@ export async function scrapeListing(targetUrl: string) {
   }
 }
 
+// Recursively zoek een veld dat lijkt op een energielabel sleutel
+function deepFindEnergyLabel(obj: any, depth = 0): string | undefined {
+  if (!obj || depth > 8) return undefined;
+  if (typeof obj !== "object") return undefined;
+  for (const [k, v] of Object.entries(obj)) {
+    const key = k.toLowerCase();
+    if (
+      (key === "energylabel" || key === "energielabel" || key === "energy_label" || key === "label" && /energ/i.test(JSON.stringify(obj).slice(0, 200)))
+    ) {
+      if (typeof v === "string" && /^[A-G](\+{1,4})?$/i.test(v.trim())) return v.trim().toUpperCase();
+      if (v && typeof v === "object") {
+        const inner = (v as any).label ?? (v as any).value ?? (v as any).code ?? (v as any).name;
+        if (typeof inner === "string" && /^[A-G](\+{1,4})?$/i.test(inner.trim())) return inner.trim().toUpperCase();
+      }
+    }
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object") {
+      const r = deepFindEnergyLabel(v, depth + 1);
+      if (r) return r;
+    }
+  }
+  return undefined;
+}
+
+function normalizeLabel(s?: string): string | undefined {
+  if (!s) return undefined;
+  const m = s.toUpperCase().match(/\b(A\+{0,4}|[B-G])\b/);
+  return m ? m[1] : undefined;
+}
+
 function parseListingHtml(html: string, url: string) {
   const pick = (re: RegExp) => {
     const m = html.match(re);
@@ -136,23 +167,65 @@ function parseListingHtml(html: string, url: string) {
     const cleaned = s.replace(/[^\d]/g, "");
     return cleaned ? Number(cleaned) : undefined;
   };
-  // Try JSON-LD first (Funda/Pararius beide gebruiken schema.org)
+
+  let prijs: number | undefined, m2: number | undefined, kamers: number | undefined, bouwjaar: number | undefined, adres: string | undefined, label: string | undefined, beschrijving: string | undefined;
+  let labelSource: string = "none";
+
+  // 1) Funda __NEXT_DATA__ — primaire bron
+  const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (nextData) {
+    try {
+      const json = JSON.parse(nextData[1]);
+      const found = deepFindEnergyLabel(json);
+      console.log("[FUNDA] __NEXT_DATA__ deepFind energielabel:", found);
+      if (found) {
+        label = normalizeLabel(found);
+        labelSource = "funda_next_data";
+      }
+      // probeer ook adres/m2/prijs/bouwjaar uit next data
+      const str = JSON.stringify(json);
+      adres = adres ?? str.match(/"streetAddress"\s*:\s*"([^"]+)"/)?.[1];
+      const m2m = str.match(/"floorArea"\s*:\s*(\d{2,4})/) ?? str.match(/"livingArea"\s*:\s*(\d{2,4})/);
+      if (m2m) m2 = Number(m2m[1]);
+      const prijsm = str.match(/"salePrice"\s*:\s*(\d{4,})/) ?? str.match(/"askingPrice"\s*:\s*(\d{4,})/);
+      if (prijsm) prijs = Number(prijsm[1]);
+      const bjm = str.match(/"constructionYear"\s*:\s*(\d{4})/) ?? str.match(/"buildYear"\s*:\s*(\d{4})/);
+      if (bjm) bouwjaar = Number(bjm[1]);
+    } catch (e) {
+      console.log("[FUNDA] __NEXT_DATA__ parse error:", (e as Error).message);
+    }
+  }
+
+  // 2) JSON-LD (schema.org) als aanvulling
   const ld = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
-  let prijs: number | undefined, m2: number | undefined, kamers: number | undefined, bouwjaar: number | undefined, adres: string | undefined, label: string | undefined;
   if (ld) {
     try {
       const data = JSON.parse(ld[1]);
       const node = Array.isArray(data) ? data[0] : data;
-      prijs = node?.offers?.price ? Number(node.offers.price) : undefined;
-      adres = node?.address?.streetAddress;
-      m2 = node?.floorSize?.value ? Number(node.floorSize.value) : undefined;
-      kamers = node?.numberOfRooms ? Number(node.numberOfRooms) : undefined;
+      prijs = prijs ?? (node?.offers?.price ? Number(node.offers.price) : undefined);
+      adres = adres ?? node?.address?.streetAddress;
+      m2 = m2 ?? (node?.floorSize?.value ? Number(node.floorSize.value) : undefined);
+      kamers = kamers ?? (node?.numberOfRooms ? Number(node.numberOfRooms) : undefined);
     } catch {}
   }
+
+  // 3) HTML-fallback voor energielabel (Funda dt/dd kenmerken-blok)
+  if (!label) {
+    const dt = html.match(/Energielabel[\s\S]{0,400}?<dd[^>]*>\s*<[^>]*>?\s*([A-G]\+{0,4})/i)
+      ?? html.match(/Energielabel[\s\S]{0,200}?>\s*([A-G]\+{0,4})\s*</i);
+    if (dt) {
+      label = normalizeLabel(dt[1]);
+      labelSource = "funda_html";
+      console.log("[FUNDA] HTML-fallback energielabel:", label);
+    }
+  }
+
   prijs = prijs ?? num(pick(/€\s*([\d\.\s]+)\s*(?:k\.k\.|v\.o\.n\.)?/i));
   m2 = m2 ?? num(pick(/(\d{2,4})\s*m²/));
-  bouwjaar = num(pick(/Bouwjaar[^<]*<[^>]*>\s*(\d{4})/i)) ?? num(pick(/(\d{4})\s*<\/[^>]+>\s*<[^>]+>\s*Bouwjaar/i));
-  label = pick(/Energielabel[^A-G]*([A-G]\+{0,4})/i);
+  bouwjaar = bouwjaar ?? num(pick(/Bouwjaar[^<]*<[^>]*>\s*(\d{4})/i)) ?? num(pick(/(\d{4})\s*<\/[^>]+>\s*<[^>]+>\s*Bouwjaar/i));
+
+  console.log(`[FUNDA] FINAL energielabel="${label ?? "(none)"}" source=${labelSource} url=${url}`);
+
   return {
     url,
     prijs,
@@ -162,6 +235,7 @@ function parseListingHtml(html: string, url: string) {
     bouwjaar,
     energielabel: label,
     adres,
+    beschrijving,
     bron: "scraperapi" as const,
   };
 }
