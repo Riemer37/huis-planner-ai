@@ -54,6 +54,30 @@ export interface ManualOverrides {
   asking_price?: number;
   rooms?: number;
   build_year?: number;
+  woning_type?: string;
+  staat?: string;
+  erfpacht?: boolean;
+  bijzonderheden?: string;
+}
+
+export interface PrefillResult {
+  query: string;
+  isUrl: boolean;
+  pdok?: PdokResult;
+  bag?: BagData;
+  energie?: { label: string } | null;
+  altum?: { woz_geschat?: number; marktwaarde?: number; huurwaarde?: number; bron: "altum_ai" } | null;
+  monument?: { rijksmonument: boolean; beschermdGezicht?: string | null };
+  funda?: Listing | null;
+  prefill: {
+    asking_price?: number;
+    living_area_m2?: number;
+    plot_area_m2?: number;
+    rooms?: number;
+    energielabel?: string;
+    build_year?: number;
+    sources: Record<string, "funda" | "bag" | "ep_online">;
+  };
 }
 
 export interface PdokResult {
