@@ -18,8 +18,14 @@ export function loadHistory(): PropertyAnalysis[] {
 
 export function saveAnalysis(a: PropertyAnalysis) {
   if (typeof window === "undefined") return;
+  const safe: PropertyAnalysis = {
+    ...a,
+    listing: a.listing?.funda_debug
+      ? { ...a.listing, funda_debug: { ...a.listing.funda_debug, raw_next_data: undefined } }
+      : a.listing,
+  };
   const list = loadHistory().filter((x) => x.id !== a.id);
-  list.unshift(a);
+  list.unshift(safe);
   const trimmed = list.slice(0, MAX);
   localStorage.setItem(KEY, JSON.stringify(trimmed));
 }
