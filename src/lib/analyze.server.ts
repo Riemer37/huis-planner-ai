@@ -340,6 +340,9 @@ Pandtype (door gebruiker geselecteerd): ${ctx.pandtype}
 PDOK locatie: ${JSON.stringify(ctx.pdok ?? "onbekend")}
 BAG verblijfsobject: ${JSON.stringify(ctx.bag ?? "onbekend")}
 Monument/beschermd gezicht: ${JSON.stringify(ctx.monument)}
+Listing (ScraperAPI): ${JSON.stringify(ctx.listing ?? "onbekend")}
+Energielabel (EP Online): ${JSON.stringify(ctx.energie ?? "onbekend")}
+Altum AI waarderef: ${JSON.stringify(ctx.altum ?? "onbekend")}
 
 Instructies:
 - score 1-10 (10 = uitstekende belegging).
