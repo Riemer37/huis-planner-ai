@@ -178,21 +178,15 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const epLabel = energie?.label?.toUpperCase().trim();
     console.log(`[ENERGIELABEL] funda="${fundaLabel ?? ""}" ep_online="${epLabel ?? ""}" isUrl=${isUrl}`);
     let energielabel: PropertyAnalysis["energielabel"];
+    const fundaBron = hasManual ? "Handmatig ingevoerd" : "Funda listing";
     if (fundaLabel && epLabel) {
       const conflict = fundaLabel !== epLabel;
-      energielabel = {
-        label: fundaLabel,
-        bron: "Funda listing",
-        label_secondary: epLabel,
-        bron_secondary: "EP-online",
-        conflict,
-      };
+      energielabel = { label: fundaLabel, bron: fundaBron, label_secondary: epLabel, bron_secondary: "EP-online", conflict };
     } else if (fundaLabel) {
-      energielabel = { label: fundaLabel, bron: "Funda listing" };
+      energielabel = { label: fundaLabel, bron: fundaBron };
     } else if (epLabel) {
       energielabel = { label: epLabel, bron: "EP-online" };
     } else {
-      // Niet raden — toon Onbekend met duidelijke bron-indicatie
       energielabel = { label: "Onbekend", bron: isUrl ? "Niet gevonden in listing" : "Niet beschikbaar" };
     }
     console.log(`[ENERGIELABEL] FINAL label="${energielabel.label}" bron="${energielabel.bron}"`);
