@@ -426,7 +426,7 @@ function parseListingHtml(html: string, url: string): Listing {
     const n = Number(rxPrice[1].replace(/[^\d]/g, ""));
     if (n > 1000) prijs = n;
   }
-  if (!m2 && rxArea) m2 = Number(rxArea[1]);
+  if (!m2 && rxAreaVal) m2 = Number(rxAreaVal);
   if (!kamers && rxRooms) kamers = Number(rxRooms[1]);
   if (!bouwjaar && rxYear) bouwjaar = Number(rxYear[1]);
   if (!label && rxEnergy) {
