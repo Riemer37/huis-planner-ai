@@ -186,18 +186,40 @@ export async function scrapeListing(targetUrl: string) {
   const key = process.env.SCRAPER_API_KEY;
   if (!key) return null;
   try {
-    let html = await fetchViaScraperApi(key, targetUrl);
+    const scraperAttempts: ScraperApiAttemptDebug[] = [];
+    let fetched = await fetchViaScraperApi(key, targetUrl);
+    scraperAttempts.push(fetched.debug);
+    let html = fetched.html;
     let attempts = 1;
     const isBlocked = (h: string | null) => !h || h.length < 100000 || !h.includes("__NEXT_DATA__");
     if (isBlocked(html)) {
       console.log(`[SCRAPERAPI] Attempt 1 blocked (len=${html?.length ?? 0}). Retrying once.`);
-      html = await fetchViaScraperApi(key, targetUrl);
+      fetched = await fetchViaScraperApi(key, targetUrl);
+      scraperAttempts.push(fetched.debug);
+      html = fetched.html;
       attempts = 2;
     }
-    if (!html) return null;
+    if (!html) {
+      return {
+        url: targetUrl,
+        bron: "manual" as const,
+        funda_debug: {
+          html_length: scraperAttempts.at(-1)?.html_length ?? 0,
+          next_data_found: scraperAttempts.some((a) => a.contains_next_data),
+          blocked: true,
+          scraperapi_attempts: scraperAttempts,
+          scraperapi_debug_output: scraperAttempts.flatMap(buildScraperApiDebugLines),
+          raw_next_data: null,
+          logs: scraperAttempts.flatMap(buildScraperApiDebugLines),
+        },
+      };
+    }
     const parsed = parseListingHtml(html, targetUrl);
     if (parsed?.funda_debug) {
       (parsed.funda_debug as any).attempts = attempts;
+      parsed.funda_debug.scraperapi_attempts = scraperAttempts;
+      parsed.funda_debug.scraperapi_debug_output = scraperAttempts.flatMap(buildScraperApiDebugLines);
+      parsed.funda_debug.logs = [...scraperAttempts.flatMap(buildScraperApiDebugLines), ...parsed.funda_debug.logs];
     }
     return parsed;
   } catch (e) {
