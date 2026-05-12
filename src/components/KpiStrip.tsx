@@ -42,7 +42,7 @@ export function KpiStrip({ a }: { a: PropertyAnalysis }) {
     <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 border-b border-border bg-background">
       <Tile icon={Home} label="Vraagprijs" value={vraag ? fmtEUR(vraag) : "—"} sub={vraag ? undefined : "Geen listing"} />
       <Tile icon={TrendingUp} label="Marktwaarde AI" value={fmtEUR(a.ai.marktwaarde_ai)} sub="AI-schatting" />
-      <Tile icon={Hammer} label="Max. bod 5% ROI" value={fmtEUR(maxBod)} />
+      <Tile icon={Hammer} label="Max. bod 10% ROI" value={fmtEUR(maxBod)} />
       <Tile
         icon={Key}
         label={a.pandtype === "commercieel" ? "Markthuur €/m²/jr" : "Markthuur p.m."}
