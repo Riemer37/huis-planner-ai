@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Circle, XCircle, Info } from "lucide-react";
-import type { PropertyAnalysis } from "@/lib/types";
+import type { DataSource, PropertyAnalysis } from "@/lib/types";
 import { fmtEUR, fmtNum, isApartment } from "@/lib/calculations";
 import { SourceBadge } from "@/components/SourceBadge";
 
@@ -172,11 +172,13 @@ function Row({
   v,
   conf,
   confTitle,
+  source,
 }: {
   k: string;
   v?: string | number | null;
   conf?: Conf;
   confTitle?: string;
+  source?: DataSource;
 }) {
   return (
     <tr className="border-b last:border-b-0">
@@ -184,7 +186,12 @@ function Row({
         {conf && <ConfDot level={conf} title={confTitle ?? ""} />}
         {k}
       </td>
-      <td className="py-1.5 tabular text-right">{v == null || v === "" ? "—" : v}</td>
+      <td className="py-1.5 tabular text-right">
+        <span className="inline-flex items-center justify-end gap-2">
+          {v == null || v === "" ? "—" : v}
+          {source && <SourceBadge source={source} />}
+        </span>
+      </td>
     </tr>
   );
 }
