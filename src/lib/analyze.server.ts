@@ -200,14 +200,16 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   if (!key) return null;
   try {
     const scraperAttempts: ScraperApiAttemptDebug[] = [];
-    let fetched = await fetchViaScraperApi(key, targetUrl);
+    // Attempt 1: render=false (fast, ~3-5s). Funda often serves __NEXT_DATA__ without JS rendering.
+    let fetched = await fetchViaScraperApi(key, targetUrl, { render: false, timeoutMs: 12000 });
     scraperAttempts.push(fetched.debug);
     let html = fetched.html;
     let attempts = 1;
     const isBlocked = (h: string | null) => !h || h.length < 100000 || !h.includes("__NEXT_DATA__");
     if (isBlocked(html)) {
-      console.log(`[SCRAPERAPI] Attempt 1 blocked (len=${html?.length ?? 0}). Retrying once.`);
-      fetched = await fetchViaScraperApi(key, targetUrl);
+      // Attempt 2: render=true (slower, ~15-20s) with bounded timeout so the function never hangs.
+      console.log(`[SCRAPERAPI] Attempt 1 (render=false) blocked (len=${html?.length ?? 0}). Retrying with render=true.`);
+      fetched = await fetchViaScraperApi(key, targetUrl, { render: true, timeoutMs: 22000 });
       scraperAttempts.push(fetched.debug);
       html = fetched.html;
       attempts = 2;
