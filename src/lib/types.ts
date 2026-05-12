@@ -20,12 +20,13 @@ export interface Listing {
 }
 
 export type DataSource = "funda" | "ep_online" | "altum_ai" | "bag" | "handmatig" | "schatting";
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export interface FundaDebug {
   html_length: number;
   next_data_found: boolean;
   blocked: boolean;
-  raw_next_data?: unknown;
+  raw_next_data?: JsonValue;
   raw_energy_label?: string;
   energy_label_field_path?: string;
   final_energy_label?: string;
