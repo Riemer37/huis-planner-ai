@@ -66,7 +66,15 @@ export interface PropertyAnalysis {
   pdok?: PdokResult;
   bag?: BagData;
   woz?: WozEntry[];
-  energielabel?: { label: string; bron?: string };
+  energielabel?: {
+    label: string;
+    bron?: string;
+    label_secondary?: string;
+    bron_secondary?: string;
+    conflict?: boolean;
+  };
+  is_apartment?: boolean;
+  databronnen?: { naam: string; data: string; status: "ok" | "fail" | "estimate" }[];
   monument?: { rijksmonument: boolean; beschermdGezicht?: string | null };
   perceel_m2?: number;
   bestemmingsplan?: { naam?: string; status?: string };

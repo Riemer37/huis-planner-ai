@@ -99,16 +99,37 @@ export function berekenBox3(woz: number, hypotheek: number, partners: boolean): 
 }
 
 export function berekenMaxBod(a: PropertyAnalysis, gewensteROI: number, renovatie: number, eigenGebruik: boolean): number {
+  // Formule: Max bod = Marktwaarde − Renovatiekosten − Aankoopkosten − (Marktwaarde × ROI%)
   const marktwaarde = a.ai.marktwaarde_ai;
-  const huur = a.ai.huurwaarde_ai * 12;
-  const ovb = ovbTarief(a.pandtype, eigenGebruik) / 100;
+  const ovbPct = ovbTarief(a.pandtype, eigenGebruik) / 100;
+  const aankoopkosten = Math.round(marktwaarde * ovbPct) + 6000; // OVB + notaris/taxatie/keuring
+  const roiKorting = Math.round(marktwaarde * (gewensteROI / 100));
+  const bod = marktwaarde - renovatie - aankoopkosten - roiKorting;
+  return Math.max(0, Math.round(bod / 1000) * 1000);
+}
+
+export function maxBodBreakdown(a: PropertyAnalysis, gewensteROI: number, renovatie: number, eigenGebruik: boolean) {
+  const marktwaarde = a.ai.marktwaarde_ai;
+  const ovbPct = ovbTarief(a.pandtype, eigenGebruik);
+  const ovb = Math.round(marktwaarde * (ovbPct / 100));
   const bijkomend = 6000;
-  // Doel: (huur - kosten) / totaal >= ROI
-  const exploitatie = huur * 0.25;
-  const netto = huur - exploitatie;
-  const totaalMax = netto / Math.max(0.001, gewensteROI / 100);
-  const bod = Math.max(0, totaalMax - renovatie - bijkomend) / (1 + ovb);
-  return Math.min(marktwaarde * 1.05, Math.round(bod / 1000) * 1000);
+  const aankoopkosten = ovb + bijkomend;
+  const roiKorting = Math.round(marktwaarde * (gewensteROI / 100));
+  const bod = Math.max(0, marktwaarde - renovatie - aankoopkosten - roiKorting);
+  return { marktwaarde, renovatie, ovb, ovbPct, bijkomend, aankoopkosten, roiKorting, gewensteROI, bod: Math.round(bod / 1000) * 1000 };
+}
+
+const APARTMENT_KEYWORDS = /(appartement|bovenwoning|benedenwoning|portiek|maisonnette|tussenverdieping|galerij|etage|flat)/i;
+
+export function isApartment(a: PropertyAnalysis): boolean {
+  if (a.is_apartment !== undefined) return a.is_apartment;
+  if (a.pandtype === "commercieel") return false;
+  if ((a.bag?.vbos ?? 0) > 1) return true;
+  const txt = `${a.listing?.beschrijving ?? ""} ${a.listing?.adres ?? ""} ${a.pdok?.adres ?? ""}`;
+  if (APARTMENT_KEYWORDS.test(txt)) return true;
+  const gd = (a.bag?.gebruiksdoel ?? "").toLowerCase();
+  if (gd.includes("woonfunctie") && (a.bag?.oppervlakte ?? 999) < 110 && !a.perceel_m2) return true;
+  return false;
 }
 
 export function berekenBAR(jaarhuur: number, aankoopprijs: number) {
