@@ -12,7 +12,7 @@ import { PurchaseTab } from "@/components/tabs/PurchaseTab";
 import { RenovationTab } from "@/components/tabs/RenovationTab";
 import { ExitTab } from "@/components/tabs/ExitTab";
 import { ManualOverridePanel } from "@/components/ManualOverridePanel";
-import { FundaDebugPanel } from "@/components/FundaDebugPanel";
+
 import { analyzeProperty } from "@/lib/analyze.functions";
 import { applyManualOverrides } from "@/lib/overrides";
 import { findCached, saveAnalysis } from "@/lib/storage";
