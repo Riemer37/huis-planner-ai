@@ -143,12 +143,19 @@ function buildScraperApiDebugLines(debug: ScraperApiAttemptDebug) {
   ];
 }
 
-async function fetchViaScraperApi(key: string, targetUrl: string): Promise<ScraperApiFetchResult> {
+async function fetchViaScraperApi(
+  key: string,
+  targetUrl: string,
+  opts: { render: boolean; timeoutMs: number },
+): Promise<ScraperApiFetchResult> {
   const encoded = encodeURIComponent(targetUrl);
-  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=true&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
+  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=${opts.render}&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
   const safeApi = api.replace(key, "[REDACTED_SCRAPER_API_KEY]");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
   try {
     const r = await fetch(api, {
+      signal: controller.signal,
       headers: {
         "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
         "X-MyHeader-Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -170,6 +177,8 @@ async function fetchViaScraperApi(key: string, targetUrl: string): Promise<Scrap
     if (!r.ok) console.log(`[SCRAPERAPI] HTTP ${r.status} for ${targetUrl}`);
     return { html: r.ok ? html : null, debug };
   } catch (e) {
+    const err = e as Error;
+    const aborted = err.name === "AbortError";
     const debug: ScraperApiAttemptDebug = {
       scraper_url: safeApi,
       html_length: 0,
@@ -177,10 +186,12 @@ async function fetchViaScraperApi(key: string, targetUrl: string): Promise<Scrap
       first_500_chars: "",
       account_status_header: null,
       credits_remaining: null,
-      error: (e as Error).message,
+      error: aborted ? `TIMEOUT after ${opts.timeoutMs}ms (render=${opts.render})` : err.message,
     };
     buildScraperApiDebugLines(debug).forEach((line) => console.log(line));
     return { html: null, debug };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -189,14 +200,16 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   if (!key) return null;
   try {
     const scraperAttempts: ScraperApiAttemptDebug[] = [];
-    let fetched = await fetchViaScraperApi(key, targetUrl);
+    // Attempt 1: render=false (fast, ~3-5s). Funda often serves __NEXT_DATA__ without JS rendering.
+    let fetched = await fetchViaScraperApi(key, targetUrl, { render: false, timeoutMs: 12000 });
     scraperAttempts.push(fetched.debug);
     let html = fetched.html;
     let attempts = 1;
     const isBlocked = (h: string | null) => !h || h.length < 100000 || !h.includes("__NEXT_DATA__");
     if (isBlocked(html)) {
-      console.log(`[SCRAPERAPI] Attempt 1 blocked (len=${html?.length ?? 0}). Retrying once.`);
-      fetched = await fetchViaScraperApi(key, targetUrl);
+      // Attempt 2: render=true (slower, ~15-20s) with bounded timeout so the function never hangs.
+      console.log(`[SCRAPERAPI] Attempt 1 (render=false) blocked (len=${html?.length ?? 0}). Retrying with render=true.`);
+      fetched = await fetchViaScraperApi(key, targetUrl, { render: true, timeoutMs: 22000 });
       scraperAttempts.push(fetched.debug);
       html = fetched.html;
       attempts = 2;
