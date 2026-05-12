@@ -1,5 +1,6 @@
 import { ExternalLink, MapPin } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
+import { SourceBadge } from "./SourceBadge";
 
 const adviesStyle = (advies: string) => {
   if (advies === "Kopen") return "bg-positive/15 text-positive border-positive/40";
@@ -27,6 +28,10 @@ function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ValuePill({ children, source }: { children: React.ReactNode; source?: PropertyAnalysis["field_sources"][string] }) {
+  return <Pill><span className="inline-flex items-center gap-1.5">{children}<SourceBadge source={source} /></span></Pill>;
+}
+
 export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
   const m2 = a.listing?.m2 ?? a.bag?.oppervlakte;
   const bouwjaar = a.bag?.bouwjaar ?? a.listing?.bouwjaar;
@@ -50,10 +55,10 @@ export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
           </h1>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Pill><span className="capitalize">{a.pandtype}</span></Pill>
-            {m2 && <Pill>{m2} m²</Pill>}
-            {a.listing?.kamers && <Pill>{a.listing.kamers} kamers</Pill>}
-            {bouwjaar && <Pill>Bouwjaar {bouwjaar}</Pill>}
-            <Pill><span className="text-gold font-semibold">Label {label}</span></Pill>
+            {m2 && <ValuePill source={a.field_sources?.living_area_m2}>{m2} m²</ValuePill>}
+            {a.listing?.kamers && <ValuePill source={a.field_sources?.rooms}>{a.listing.kamers} kamers</ValuePill>}
+            {bouwjaar && <ValuePill source={a.field_sources?.build_year}>Bouwjaar {bouwjaar}</ValuePill>}
+            <ValuePill source={a.field_sources?.energy_label}><span className="text-gold font-semibold">Label {label}</span></ValuePill>
             {a.listing?.url && (
               <a href={a.listing.url} target="_blank" rel="noreferrer">
                 <Pill><span className="inline-flex items-center gap-1 text-primary">Listing <ExternalLink className="size-3" /></span></Pill>
