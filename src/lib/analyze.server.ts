@@ -855,12 +855,17 @@ export function buildPrompt(ctx: any) {
 - OVB is altijd 10,4% (geen 2% startersregeling).
 - Energielabel mag ontbreken — niet verplicht voor commercieel.\n`
     : "";
+  const askingPrice = ctx.listing?.prijs ?? ctx.listing?.vraagprijs;
+  const m2 = ctx.listing?.m2;
+  const priceLine = askingPrice
+    ? `\nVRAAGPRIJS (door verkoper): € ${askingPrice.toLocaleString("nl-NL")} k.k. — gebruik dit ALS ANKER voor je marktwaarde_ai. Wijk niet meer dan ±20% af zonder expliciete onderbouwing.${m2 ? ` Oppervlakte: ${m2} m² → vraagprijs/m² = € ${Math.round(askingPrice / m2).toLocaleString("nl-NL")}/m².` : ""}\n`
+    : "";
   return `Analyseer dit pand voor een Nederlandse vastgoedbelegger en roep de tool 'analyse_pand' aan.
 
 Invoer: ${ctx.query}
 Soort invoer: ${ctx.isUrl ? (ctx.isFundaInBusiness ? "URL (Funda in Business — commercieel)" : "URL (Funda/Pararius/Vendr)") : "Adres"}
 Pandtype (door gebruiker geselecteerd): ${ctx.pandtype}
-${fib}
+${fib}${priceLine}
 PDOK locatie: ${JSON.stringify(ctx.pdok ?? "onbekend")}
 BAG verblijfsobject: ${JSON.stringify(ctx.bag ?? "onbekend")}
 Monument/beschermd gezicht: ${JSON.stringify(ctx.monument)}
