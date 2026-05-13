@@ -7,6 +7,7 @@ import {
   cryptoRandomId,
   fallbackAI,
   fetchAltum,
+  fetchAltumWozHistory,
   fetchBagApi,
   fetchBagVbo,
   fetchEnergielabel,
@@ -120,7 +121,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const huisnummer = extractHuisnummer(pdok?.adres) ?? extractHuisnummer(addressForPdok);
 
     // Fase 2: parallelle data-ophaal
-    const [bagWfs, bagApi, monument, energie, altum] = await Promise.all([
+    const [bagWfs, bagApi, monument, energie, altum, altumWoz] = await Promise.all([
       fetchBagVbo(pdok?.bagId).catch((e: any) => {
         errors.bag_wfs = String(e?.message ?? e);
         return null;
@@ -141,6 +142,10 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         errors.altum = String(e?.message ?? e);
         return null;
       }),
+      fetchAltumWozHistory(pdok?.postcode, huisnummer).catch((e: any) => {
+        errors.altum_woz = String(e?.message ?? e);
+        return null;
+      }),
     ]);
 
     const bag = bagApi ?? bagWfs;
@@ -149,6 +154,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (monument?.rijksmonument) bronnen.push("RCE Monumenten");
     if (energie) bronnen.push("EP Online");
     if (altum) bronnen.push("Altum AI");
+    if (altumWoz?.length) bronnen.push("Altum AI WOZ-historie");
 
     // Fase 3: AI primair (Lovable) + secundair (Anthropic) parallel
     const prompt = buildPrompt({
