@@ -28,6 +28,18 @@ function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
+function pandtypeLabel(a: PropertyAnalysis): string {
+  if (a.pandtype === "commercieel") {
+    const url = a.listing?.url ?? "";
+    if (/fundainbusiness\.nl\/kantoor/i.test(url)) return "Kantoor";
+    if (/fundainbusiness\.nl\/winkel/i.test(url)) return "Winkel";
+    if (/fundainbusiness\.nl\/bedrijfsruimte/i.test(url)) return "Bedrijfsruimte";
+    if (/fundainbusiness\.nl\/horeca/i.test(url)) return "Horeca";
+    return "Commercieel";
+  }
+  return a.pandtype;
+}
+
 function ValuePill({ children, source }: { children: React.ReactNode; source?: DataSource }) {
   return <Pill><span className="inline-flex items-center gap-1.5">{children}<SourceBadge source={source} /></span></Pill>;
 }
