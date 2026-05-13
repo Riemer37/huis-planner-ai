@@ -66,7 +66,7 @@ export interface PrefillResult {
   pdok?: PdokResult;
   bag?: BagData;
   energie?: { label: string } | null;
-  altum?: { woz_geschat?: number; marktwaarde?: number; huurwaarde?: number; bron: "altum_ai" } | null;
+  altum?: { woz_geschat?: number; marktwaarde?: number; huurwaarde?: number; oppervlakte?: number; bouwjaar?: number; bron: "altum_ai" } | null;
   monument?: { rijksmonument: boolean; beschermdGezicht?: string | null };
   funda?: Listing | null;
   prefill: {
