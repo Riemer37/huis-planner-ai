@@ -131,6 +131,30 @@ function toNumber(v: unknown): number | undefined {
   return undefined;
 }
 
+function parseDutchWholeNumber(value: string): number | null {
+  const digits = value.replace(/&nbsp;/gi, " ").replace(/[\s\u00a0]/g, "").replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) ? n : null;
+}
+
+function extractFundaInBusinessPrice(html: string): { value: number; raw: string; source: string } | null {
+  const prijsAnchors: Array<{ source: string; re: RegExp }> = [
+    { source: "sellingPrice", re: /"sellingPrice"\s*:\s*"?(\d{5,9})"?/i },
+    { source: "price", re: /"price"\s*:\s*"?(\d{5,9})"?/i },
+    { source: "koopprijs", re: /koopprijs[\s\S]{0,120}?€?\s*([\d.\s]{5,})/i },
+    { source: "vraagprijs", re: /vraagprijs[\s\S]{0,120}?€?\s*([\d.\s]{5,})/i },
+    { source: "euro-kosten-koper", re: /€\s*([\d.\s]{5,})\s*(?:k\.k\.|v\.o\.n\.|kosten\s*koper)/i },
+  ];
+  for (const { source, re } of prijsAnchors) {
+    const match = html.match(re);
+    if (!match) continue;
+    const value = parseDutchWholeNumber(match[1]);
+    if (value !== null && value >= 50_000 && value <= 100_000_000) return { value, raw: match[1], source };
+  }
+  return null;
+}
+
 function normLabel(v: unknown): string | undefined {
   if (typeof v !== "string") return undefined;
   const m = v.trim().toUpperCase().match(/A\+{0,4}|[B-G]/);
