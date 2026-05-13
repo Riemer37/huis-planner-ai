@@ -257,8 +257,8 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "EP-online energielabel", data: epLabel ?? "—", status: epLabel ? "ok" : "fail" },
       { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : ((listing?.bron === "apify" || listing?.bron === "scraperapi") ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : (listing?.bron === "apify" || listing?.bron === "scraperapi") ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
-      { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
-      { naam: "Altum AI WOZ-historie", data: altumWoz?.length ? `${altumWoz.length} jaren` : "—", status: altumWoz?.length ? "ok" : "estimate" },
+      { naam: "Marktwaarde", data: altum?.marktwaarde ? `€${altum.marktwaarde}${altum.marktwaarde_source === "woz_x110" ? " (WOZ ×1,10)" : altum.marktwaarde_source === "cached" ? " (cache)" : ""}` : "—", status: altum?.marktwaarde_source === "altum_avm" || altum?.marktwaarde_source === "cached" ? "ok" : altum?.marktwaarde ? "estimate" : "estimate" },
+      { naam: "WOZ Waardeloket (Kadaster)", data: wozReal?.length ? `${wozReal.length} jaren` : "—", status: wozReal?.length ? "ok" : "fail" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
     ];
 
@@ -276,8 +276,8 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       altum: altum ?? null,
       errors,
       bronnen,
-      woz: altumWoz?.length
-        ? altumWoz
+      woz: wozReal?.length
+        ? wozReal
         : altum?.woz_geschat
           ? synthesizeWoz(altum.woz_geschat * 1.1)
           : synthesizeWoz(primary.marktwaarde_ai),
