@@ -450,7 +450,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
 
   const prijs = vraagprijs ?? undefined;
   const m2 = woonoppervlakte ?? undefined;
-
+  console.log(`[scrapeFunda] returning listing m2=${m2} prijs=${prijs} fibAnchor=${m2FibAnchor} url=${targetUrl}`);
 
   return {
     url: targetUrl,
