@@ -7,12 +7,12 @@ import {
   cryptoRandomId,
   fallbackAI,
   fetchAltum,
-  fetchAltumWozHistory,
   fetchBagApi,
   fetchBagVbo,
   fetchEnergielabel,
   fetchPdok,
   fetchRijksmonument,
+  fetchWozWaardeloket,
   scrapeListing,
   synthesizeWoz,
 } from "./analyze.server";
