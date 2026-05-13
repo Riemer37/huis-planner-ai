@@ -20,6 +20,8 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
 
   useEffect(() => {
     setHistory(loadHistory());
+    if (current?.pandtype) setPandtype(current.pandtype);
+    if (current?.input && current.input !== q) setQ(current.input);
   }, [current?.id]);
 
   // Auto-detect Funda in Business → commercieel
