@@ -102,11 +102,18 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
     if (!r.ok) return null;
     const j: any = await r.json();
     const d = j?.Output ?? j?.data ?? j;
+    const opp =
+      d?.InnerSurfaceArea ?? d?.inner_surface_area ?? d?.LivingArea ?? d?.living_area ??
+      d?.SurfaceArea ?? d?.surface_area ?? d?.FloorArea ?? undefined;
+    const bj = d?.BuildYear ?? d?.build_year ?? d?.YearOfConstruction ?? undefined;
+    console.log(`[ALTUM] opp=${opp} bj=${bj} avm=${d?.AVM} woz=${d?.WOZ}`);
     return {
       bron: "altum_ai" as const,
       marktwaarde: d?.AVM ?? d?.market_value ?? d?.value ?? undefined,
       woz_geschat: d?.WOZ ?? d?.woz_value ?? undefined,
       huurwaarde: d?.RentalValue ?? d?.rent ?? undefined,
+      oppervlakte: opp ? Number(opp) : undefined,
+      bouwjaar: bj ? Number(bj) : undefined,
     };
   } catch {
     return null;
