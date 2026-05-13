@@ -312,6 +312,8 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     constructionYear: bouwjaar,
     numberOfRooms: aantalKamers,
     plotArea: perceeloppervlakte,
+    fibAnchor: m2FibAnchor,
+    isFundaInBusiness: isFundaInBusiness ? 1 : 0,
   };
   logs.push(`[Regex raw] ${JSON.stringify(regexResults)}`);
   logs.push(`[HTML first 2000] ${html.substring(0, 2000)}`);
