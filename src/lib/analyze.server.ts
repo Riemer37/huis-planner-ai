@@ -226,10 +226,31 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   }
 
   // Precise HTML regex extraction
-  const prijsMatch =
+  let prijsMatch: RegExpMatchArray | null =
     html.match(/["']price["']\s*:\s*(\d+)/) ??
     html.match(/vraagprijs[^€]*€\s*([\d.,]+)/i) ??
     html.match(/€\s*([\d.]+\.[\d]{3})/i);
+
+  // Funda in Business heeft andere prijs-structuur (koopprijs / sellingPrice / "€ 3.600.000 k.k.")
+  if (isFundaInBusiness) {
+    const fibPriceAnchors: RegExp[] = [
+      /"sellingPrice"\s*:\s*(\d+)/i,
+      /"price"\s*:\s*(\d+)/i,
+      /koopprijs[^\d€]*€?\s*([\d\.]+)/i,
+      /vraagprijs[^\d€]*€?\s*([\d\.]+)/i,
+      /€\s*([\d\.]+)\s*(?:k\.k\.|v\.o\.n\.|kosten\s*koper)/i,
+    ];
+    for (const re of fibPriceAnchors) {
+      const m = html.match(re);
+      if (m) {
+        const raw = parseInt(m[1].replace(/\./g, ""), 10);
+        if (raw >= 50_000 && raw <= 100_000_000) {
+          prijsMatch = m;
+          break;
+        }
+      }
+    }
+  }
 
   // Funda migrated to Nuxt: JSON numbers like "livingArea": 33 are array-index pointers, NOT real values.
   // Never parse m²/field values from Nuxt JSON numbers; use anchored visible HTML only.
