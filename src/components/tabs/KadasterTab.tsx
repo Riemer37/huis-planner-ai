@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Circle, XCircle, Info } from "lucide-react";
+import { CheckCircle2, Circle, XCircle, Info } from "lucide-react";
 import type { DataSource, PropertyAnalysis } from "@/lib/types";
 import { fmtEUR, fmtNum, isApartment } from "@/lib/calculations";
 import { SourceBadge } from "@/components/SourceBadge";
