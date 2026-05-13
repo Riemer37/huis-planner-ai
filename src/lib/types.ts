@@ -147,7 +147,7 @@ export interface PropertyAnalysis {
   bestemmingsplan?: { naam?: string; status?: string };
   ai: AiAnalysis;
   ai_secondary?: { bron: "anthropic"; samenvatting: string; advies?: string; score?: number };
-  altum?: { woz_geschat?: number; marktwaarde?: number; huurwaarde?: number; oppervlakte?: number; bouwjaar?: number; bron: "altum_ai" } | null;
+  altum?: { woz_geschat?: number; marktwaarde?: number; huurwaarde?: number; oppervlakte?: number; bouwjaar?: number; bron: "altum_ai"; marktwaarde_source?: "altum_avm" | "woz_x110" | "cached"; rate_limited?: boolean } | null;
   errors?: Record<string, string>;
   bronnen?: string[];
 }
