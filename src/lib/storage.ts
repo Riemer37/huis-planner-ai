@@ -65,7 +65,7 @@ export function saveAnalysis(a: PropertyAnalysis) {
 }
 
 export function findCached(input: string): PropertyAnalysis | undefined {
-  return loadHistory().find((a) => a.input.toLowerCase() === input.toLowerCase());
+  return loadHistory().find((a) => sameInput(a.input, input));
 }
 
 export function clearCachedInput(input: string) {
