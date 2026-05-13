@@ -92,7 +92,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       });
       if (scraped) {
         listing = scraped;
-        bronnen.push("ScraperAPI");
+        bronnen.push("Apify");
         if (scraped.adres) addressForPdok = scraped.adres;
       } else {
         listing = { url: data.query, bron: "manual" };
@@ -206,7 +206,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "PDOK Locatieserver", data: pdok?.adres ?? "—", status: pdok ? "ok" : "fail" },
       { naam: "BAG (Kadaster)", data: bag?.oppervlakte ? `${bag.oppervlakte} m² · ${bag.gebruiksdoel ?? "—"}` : "—", status: bag ? "ok" : "fail" },
       { naam: "EP-online energielabel", data: epLabel ?? "—", status: epLabel ? "ok" : "fail" },
-      { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : (listing?.bron === "scraperapi" ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : listing?.bron === "scraperapi" ? "ok" : (isUrl ? "fail" : "estimate") },
+      { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : ((listing?.bron === "apify" || listing?.bron === "scraperapi") ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : (listing?.bron === "apify" || listing?.bron === "scraperapi") ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
       { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },

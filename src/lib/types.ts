@@ -16,7 +16,7 @@ export interface Listing {
   adres?: string;
   erfpacht?: boolean;
   beschrijving?: string;
-  bron?: "scraperapi" | "manual";
+  bron?: "scraperapi" | "apify" | "manual";
   funda_debug?: FundaDebug;
 }
 

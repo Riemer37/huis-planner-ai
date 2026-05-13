@@ -1,4 +1,4 @@
-import type { Listing } from "./types";
+import type { Listing, JsonValue } from "./types";
 
 // Helpers used only on server
 export async function fetchPdok(query: string) {
@@ -113,133 +113,161 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
   }
 }
 
-// ---------- ScraperAPI — Funda / Pararius listing ----------
-type ScraperApiAttemptDebug = {
-  scraper_url: string;
-  response_status?: number;
-  html_length: number;
-  contains_next_data: boolean;
-  first_500_chars: string;
-  account_status_header?: string | null;
-  credits_remaining?: string | null;
-  error?: string;
-};
+// ---------- Apify — Funda listing ----------
+const APIFY_ENDPOINT =
+  "https://api.apify.com/v2/acts/nocodeventure~funda-scraper/run-sync-get-dataset-items";
 
-type ScraperApiFetchResult = {
-  html: string | null;
-  debug: ScraperApiAttemptDebug;
-};
-
-function buildScraperApiDebugLines(debug: ScraperApiAttemptDebug) {
-  return [
-    `1. ScraperAPI URL being called: ${debug.scraper_url}`,
-    `2. Response status: ${debug.response_status ?? "NO_RESPONSE"}`,
-    `3. HTML length received: ${debug.html_length}`,
-    `4. Contains __NEXT_DATA__: ${debug.contains_next_data}`,
-    `5. First 500 characters of response: ${debug.first_500_chars}`,
-    `6. ScraperAPI account status header: ${debug.account_status_header ?? "null"}`,
-    `7. ScraperAPI credits remaining: ${debug.credits_remaining ?? "null"}`,
-    ...(debug.error ? [`ScraperAPI fetch error: ${debug.error}`] : []),
-  ];
+function toNumber(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const cleaned = v.replace(/[^\d,.\-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+    const n = parseFloat(cleaned);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
 }
 
-async function fetchViaScraperApi(
-  key: string,
-  targetUrl: string,
-  opts: { render: boolean; timeoutMs: number },
-): Promise<ScraperApiFetchResult> {
-  const encoded = encodeURIComponent(targetUrl);
-  const api = `http://api.scraperapi.com?api_key=${key}&url=${encoded}&render=${opts.render}&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
-  const safeApi = api.replace(key, "[REDACTED_SCRAPER_API_KEY]");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
-  try {
-    const r = await fetch(api, {
-      signal: controller.signal,
-      headers: {
-        "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
-        "X-MyHeader-Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "X-MyHeader-User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      },
-    });
-    const html = await r.text();
-    const debug: ScraperApiAttemptDebug = {
-      scraper_url: safeApi,
-      response_status: r.status,
-      html_length: html.length,
-      contains_next_data: html.includes("__NEXT_DATA__"),
-      first_500_chars: html.substring(0, 500),
-      account_status_header: r.headers.get("sa-statuscode"),
-      credits_remaining: r.headers.get("sa-credit-left"),
-    };
-    buildScraperApiDebugLines(debug).forEach((line) => console.log(line));
-    if (!r.ok) console.log(`[SCRAPERAPI] HTTP ${r.status} for ${targetUrl}`);
-    return { html: r.ok ? html : null, debug };
-  } catch (e) {
-    const err = e as Error;
-    const aborted = err.name === "AbortError";
-    const debug: ScraperApiAttemptDebug = {
-      scraper_url: safeApi,
-      html_length: 0,
-      contains_next_data: false,
-      first_500_chars: "",
-      account_status_header: null,
-      credits_remaining: null,
-      error: aborted ? `TIMEOUT after ${opts.timeoutMs}ms (render=${opts.render})` : err.message,
-    };
-    buildScraperApiDebugLines(debug).forEach((line) => console.log(line));
-    return { html: null, debug };
-  } finally {
-    clearTimeout(timer);
-  }
+function normLabel(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const m = v.trim().toUpperCase().match(/A\+{0,4}|[B-G]/);
+  return m ? m[0] : undefined;
 }
 
 export async function scrapeListing(targetUrl: string): Promise<Listing | null> {
-  const key = process.env.SCRAPER_API_KEY;
-  if (!key) return null;
+  const key = process.env.APIFY_API_KEY;
+  if (!key) {
+    console.log("[APIFY] APIFY_API_KEY not set");
+    return null;
+  }
+  const logs: string[] = [];
+  const url = `${APIFY_ENDPOINT}?token=${encodeURIComponent(key)}`;
+  const safeUrl = `${APIFY_ENDPOINT}?token=[REDACTED]`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90_000);
   try {
-    const scraperAttempts: ScraperApiAttemptDebug[] = [];
-    // Attempt 1: render=false (fast, ~3-5s). Funda often serves __NEXT_DATA__ without JS rendering.
-    let fetched = await fetchViaScraperApi(key, targetUrl, { render: false, timeoutMs: 12000 });
-    scraperAttempts.push(fetched.debug);
-    let html = fetched.html;
-    let attempts = 1;
-    const isBlocked = (h: string | null) => !h || h.length < 50000;
-    if (isBlocked(html)) {
-      // Attempt 2: render=true (slower, ~15-20s) with bounded timeout so the function never hangs.
-      console.log(`[SCRAPERAPI] Attempt 1 (render=false) blocked (len=${html?.length ?? 0}). Retrying with render=true.`);
-      fetched = await fetchViaScraperApi(key, targetUrl, { render: true, timeoutMs: 22000 });
-      scraperAttempts.push(fetched.debug);
-      html = fetched.html;
-      attempts = 2;
-    }
-    if (!html) {
+    logs.push(`Apify endpoint: ${safeUrl}`);
+    logs.push(`Target URL: ${targetUrl}`);
+    const r = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        urls: [{ url: targetUrl }],
+        maxResultsPerSearch: 1,
+      }),
+    });
+    logs.push(`Response status: ${r.status}`);
+    const text = await r.text();
+    if (!r.ok) {
+      logs.push(`Response body (first 500): ${text.substring(0, 500)}`);
+      console.log(`[APIFY] HTTP ${r.status}: ${text.substring(0, 200)}`);
       return {
         url: targetUrl,
-        bron: "manual" as const,
+        bron: "manual",
         funda_debug: {
-          html_length: scraperAttempts.at(-1)?.html_length ?? 0,
-          next_data_found: scraperAttempts.some((a) => a.contains_next_data),
+          html_length: text.length,
+          next_data_found: false,
           blocked: true,
-          scraperapi_attempts: scraperAttempts,
-          scraperapi_debug_output: scraperAttempts.flatMap(buildScraperApiDebugLines),
           raw_next_data: null,
-          logs: scraperAttempts.flatMap(buildScraperApiDebugLines),
+          logs,
+          scraperapi_debug_output: logs,
         },
       };
     }
-    const parsed = parseListingHtml(html, targetUrl);
-    if (parsed?.funda_debug) {
-      (parsed.funda_debug as any).attempts = attempts;
-      parsed.funda_debug.scraperapi_attempts = scraperAttempts;
-      parsed.funda_debug.scraperapi_debug_output = scraperAttempts.flatMap(buildScraperApiDebugLines);
-      parsed.funda_debug.logs = [...scraperAttempts.flatMap(buildScraperApiDebugLines), ...parsed.funda_debug.logs];
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      logs.push(`JSON parse error: ${(e as Error).message}`);
+      logs.push(`Body (first 500): ${text.substring(0, 500)}`);
+      return {
+        url: targetUrl,
+        bron: "manual",
+        funda_debug: {
+          html_length: text.length,
+          next_data_found: false,
+          blocked: true,
+          raw_next_data: null,
+          logs,
+          scraperapi_debug_output: logs,
+        },
+      };
     }
-    return parsed;
+    const first = Array.isArray(data) ? data[0] : null;
+    if (!first || typeof first !== "object") {
+      logs.push(`Empty dataset (length=${Array.isArray(data) ? data.length : "n/a"})`);
+      return {
+        url: targetUrl,
+        bron: "manual",
+        funda_debug: {
+          html_length: text.length,
+          next_data_found: false,
+          blocked: true,
+          raw_next_data: null,
+          logs,
+          scraperapi_debug_output: logs,
+        },
+      };
+    }
+
+    const prijs = toNumber(first.price);
+    const m2 = toNumber(first.surfaceArea);
+    const perceel = toNumber(first.parcelSurfaceArea);
+    const kamers = toNumber(first.numberOfRooms);
+    const energielabel = normLabel(first.energyClass);
+    const bouwjaar = toNumber(first.yearBuilt ?? first.buildYear ?? first.constructionYear);
+
+    const titleParts: string[] = [];
+    if (typeof first.title === "string") titleParts.push(first.title);
+    if (typeof first.postalCode === "string") titleParts.push(first.postalCode);
+    if (typeof first.city === "string") titleParts.push(first.city);
+    const adres = titleParts.length ? titleParts.join(", ") : undefined;
+
+    logs.push(
+      `Apify ok: price=${prijs} m2=${m2} perceel=${perceel} kamers=${kamers} label=${energielabel} bouwjaar=${bouwjaar} adres=${adres}`,
+    );
+
+    return {
+      url: targetUrl,
+      prijs,
+      vraagprijs: prijs,
+      m2,
+      perceel_m2: perceel,
+      kamers,
+      energielabel,
+      bouwjaar,
+      adres,
+      beschrijving: typeof first.description === "string" ? first.description : undefined,
+      bron: "apify",
+      funda_debug: {
+        html_length: text.length,
+        next_data_found: true,
+        blocked: false,
+        raw_next_data: first as JsonValue,
+        final_energy_label: energielabel,
+        logs,
+        scraperapi_debug_output: logs,
+      },
+    };
   } catch (e) {
-    console.log("[SCRAPERAPI] error:", (e as Error).message);
-    return null;
+    const err = e as Error;
+    const aborted = err.name === "AbortError";
+    logs.push(aborted ? "TIMEOUT after 90000ms" : `Error: ${err.message}`);
+    console.log("[APIFY] error:", err.message);
+    return {
+      url: targetUrl,
+      bron: "manual",
+      funda_debug: {
+        html_length: 0,
+        next_data_found: false,
+        blocked: true,
+        raw_next_data: null,
+        logs,
+        scraperapi_debug_output: logs,
+      },
+    };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

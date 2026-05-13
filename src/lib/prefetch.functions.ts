@@ -32,7 +32,7 @@ export const prefetchProperty = createServerFn({ method: "POST" })
     let addressForPdok = data.query;
     if (isUrl) {
       const scrapePromise = scrapeListing(data.query).catch(() => null);
-      const timeoutPromise = new Promise<null>((res) => setTimeout(() => res(null), 20000));
+      const timeoutPromise = new Promise<null>((res) => setTimeout(() => res(null), 90000));
       funda = (await Promise.race([scrapePromise, timeoutPromise])) ?? null;
       if (funda?.adres) addressForPdok = funda.adres;
       else {
