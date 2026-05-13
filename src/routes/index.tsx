@@ -186,6 +186,17 @@ function EmptyState({ error, debug, loading, onAnalyze }: { error: string | null
         {error && (
           <p className="mt-4 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-3 text-center">{error}</p>
         )}
+        {debug && (
+          <div className="mt-4 text-xs bg-muted border border-border rounded-md p-3 max-h-96 overflow-auto text-left font-mono">
+            <div className="font-bold mb-2">Apify debug</div>
+            {debug.logs.map((l, i) => (
+              <div key={i} className="whitespace-pre-wrap break-all">{l}</div>
+            ))}
+            {debug.raw != null && (
+              <pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(debug.raw, null, 2)}</pre>
+            )}
+          </div>
+        )}
 
         <div className="mt-8 grid grid-cols-3 gap-3 text-[11px]">
           {[
