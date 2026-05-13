@@ -1,4 +1,4 @@
-import type { Listing } from "./types";
+import type { Listing, JsonValue } from "./types";
 
 // Helpers used only on server
 export async function fetchPdok(query: string) {
