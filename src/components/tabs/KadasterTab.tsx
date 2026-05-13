@@ -94,14 +94,20 @@ export function KadasterTab({ a, onUpdate }: { a: PropertyAnalysis; onUpdate?: (
             <div className="flex items-center justify-between mb-3">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Energielabel</div>
               {(() => {
+                const kind = a.energielabel?.source_kind;
                 const bron = a.energielabel?.bron ?? "—";
-                const isVerified = bron === "Funda listing" || bron === "EP-online";
                 const isUnknown = (a.energielabel?.label ?? "").toLowerCase() === "onbekend" || !a.energielabel?.label;
-                const cls = isVerified ? "text-positive" : isUnknown ? "text-destructive" : "text-warning";
+                const badgeCls =
+                  kind === "funda"
+                    ? "bg-blue-100 text-blue-800 border border-blue-300"
+                    : kind === "ep_online"
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                      : kind === "handmatig"
+                        ? "bg-amber-100 text-amber-800 border border-amber-300"
+                        : "bg-destructive/10 text-destructive border border-destructive/30";
                 return (
-                  <span className={`text-[11px] font-medium inline-flex items-center gap-1.5 ${cls}`}>
-                    <ConfDot level={isVerified ? "ok" : isUnknown ? "fail" : "estimate"} title="Bron" />
-                    {isUnknown ? "Onbekend — handmatig controleren" : `${a.energielabel?.label} — Bron: ${bron}`}
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeCls}`}>
+                    {isUnknown && !a.energielabel?.needs_manual ? "Onbekend" : `Bron: ${bron}`}
                   </span>
                 );
               })()}
@@ -121,14 +127,24 @@ export function KadasterTab({ a, onUpdate }: { a: PropertyAnalysis; onUpdate?: (
                 );
               })}
             </div>
-            {a.energielabel?.conflict && (
-              <div className="mt-3 flex items-start gap-2 text-xs rounded border border-warning/40 bg-warning/10 text-warning p-2.5">
-                <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-                <span>
-                  Let op: bronnen verschillen — Funda: <strong>{a.energielabel.label}</strong>, EP-online:{" "}
-                  <strong>{a.energielabel.label_secondary}</strong>. Controleer via{" "}
-                  <a href="https://www.ep-online.nl" target="_blank" rel="noreferrer" className="underline">ep-online.nl</a>.
-                </span>
+            {a.energielabel?.needs_manual && (
+              <div className="mt-3 flex items-center gap-2 text-xs">
+                <label className="text-muted-foreground">Handmatig invoeren:</label>
+                <select
+                  className="border border-border bg-background rounded px-2 py-1 text-xs font-semibold"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v || !onUpdate) return;
+                    onUpdate({
+                      ...a,
+                      energielabel: { label: v, bron: "Handmatig", source_kind: "handmatig" },
+                    });
+                  }}
+                >
+                  <option value="" disabled>Kies label…</option>
+                  {labels.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
               </div>
             )}
           </div>
