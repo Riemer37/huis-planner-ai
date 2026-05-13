@@ -53,9 +53,12 @@ function VastgoedAI() {
     setDebug(null);
     setAnalysis(null);
     const isUrl = /^https?:\/\//i.test(q);
+    const isFundaInBusiness = isUrl && /fundainbusiness\.nl/i.test(q);
+    // Funda in Business = altijd commercieel pand
+    const effectivePandtype: PandType = isFundaInBusiness ? "commercieel" : pandtype;
     if (!isUrl) {
       const cached = findCached(q);
-      if (cached && cached.pandtype === pandtype) {
+      if (cached && cached.pandtype === effectivePandtype) {
         setAnalysis(cached);
         return;
       }
@@ -70,7 +73,7 @@ function VastgoedAI() {
     ]);
     try {
       const result = (await analyze({
-        data: { query: q, pandtype, isUrl },
+        data: { query: q, pandtype: effectivePandtype, isUrl },
       })) as PropertyAnalysis;
       if (isUrl && result.listing?.funda_debug?.blocked) {
         setError(

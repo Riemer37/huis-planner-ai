@@ -28,6 +28,18 @@ function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
+function pandtypeLabel(a: PropertyAnalysis): string {
+  if (a.pandtype === "commercieel") {
+    const url = a.listing?.url ?? "";
+    if (/fundainbusiness\.nl\/kantoor/i.test(url)) return "Kantoor";
+    if (/fundainbusiness\.nl\/winkel/i.test(url)) return "Winkel";
+    if (/fundainbusiness\.nl\/bedrijfsruimte/i.test(url)) return "Bedrijfsruimte";
+    if (/fundainbusiness\.nl\/horeca/i.test(url)) return "Horeca";
+    return "Commercieel";
+  }
+  return a.pandtype;
+}
+
 function ValuePill({ children, source }: { children: React.ReactNode; source?: DataSource }) {
   return <Pill><span className="inline-flex items-center gap-1.5">{children}<SourceBadge source={source} /></span></Pill>;
 }
@@ -60,8 +72,12 @@ export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
             {a.pdok?.adres ?? a.input}
           </h1>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <Pill><span className="capitalize">{a.pandtype}</span></Pill>
-            {m2 && <ValuePill source={a.field_sources?.living_area_m2}>{m2} m²</ValuePill>}
+            <Pill><span className="capitalize">{pandtypeLabel(a)}</span></Pill>
+            {m2 ? (
+              <ValuePill source={a.field_sources?.living_area_m2}>{m2} m²</ValuePill>
+            ) : (
+              <Pill><span className="text-muted-foreground">Oppervlakte onbekend</span></Pill>
+            )}
             {a.listing?.kamers && <ValuePill source={a.field_sources?.rooms}>{a.listing.kamers} kamers</ValuePill>}
             {bouwjaar && <ValuePill source={a.field_sources?.build_year}>Bouwjaar {bouwjaar}</ValuePill>}
             <ValuePill source={a.field_sources?.energy_label}><span className="text-gold font-semibold">Label {label}</span></ValuePill>

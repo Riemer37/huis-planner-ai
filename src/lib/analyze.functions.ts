@@ -52,6 +52,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const errors: Record<string, string> = {};
     const bronnen: string[] = ["PDOK"];
     const isUrl = data.isUrl ?? /^https?:\/\//i.test(data.query);
+    const isFundaInBusiness = isUrl && /fundainbusiness\.nl/i.test(data.query);
+    // Funda in Business URL = altijd commercieel pand (server-side defense)
+    if (isFundaInBusiness && data.pandtype !== "commercieel") {
+      data = { ...data, pandtype: "commercieel" };
+    }
     const manual = data.manualInput;
     const hasManual = !!manual;
 
@@ -156,6 +161,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       altum,
       energie,
       isUrl,
+      isFundaInBusiness,
     });
 
     const [primary, secondary] = await Promise.all([
@@ -182,6 +188,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     let energielabel: PropertyAnalysis["energielabel"];
     if (hasManual && manual!.energielabel) {
       energielabel = { label: manual!.energielabel.toUpperCase(), bron: "Handmatig", source_kind: "handmatig" };
+    } else if (isFundaInBusiness) {
+      // Commercieel pand — energielabel vaak niet beschikbaar; niet gokken
+      energielabel = fundaLabel
+        ? { label: fundaLabel, bron: "Funda in Business", source_kind: "funda" }
+        : { label: "Niet beschikbaar", bron: "Energielabel niet vereist voor commercieel pand", source_kind: "none" };
     } else if (isUrl) {
       // Funda-pad — geen vermenging met EP-online
       if (fundaLabel) {
