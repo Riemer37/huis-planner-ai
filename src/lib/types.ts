@@ -134,6 +134,8 @@ export interface PropertyAnalysis {
     label_secondary?: string;
     bron_secondary?: string;
     conflict?: boolean;
+    needs_manual?: boolean;
+    source_kind?: "funda" | "ep_online" | "handmatig" | "none";
   };
   is_apartment?: boolean;
   databronnen?: { naam: string; data: string; status: "ok" | "fail" | "estimate" }[];
