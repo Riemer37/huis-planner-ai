@@ -193,6 +193,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     console.log("[ScraperAPI] SCRAPER_API_KEY not set");
     return null;
   }
+  const isFundaInBusiness = /fundainbusiness\.nl/i.test(targetUrl);
   const logs: string[] = [];
 
   // Attempt 1: render=false
