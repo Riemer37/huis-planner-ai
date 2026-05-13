@@ -19,8 +19,14 @@ function RiskBar({ label, value }: { label: string; value: number }) {
 export function OverviewTab({ a }: { a: PropertyAnalysis }) {
   const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
   const altumMarkt = a.altum?.marktwaarde;
+  const mwSource = a.altum?.marktwaarde_source;
   const marktwaarde = altumMarkt ?? a.ai.marktwaarde_ai;
-  const marktwaardeBron = altumMarkt ? "Altum AI" : "AI-schatting";
+  const marktwaardeBron =
+    mwSource === "altum_avm" ? "Altum AI"
+    : mwSource === "cached" ? "Altum AI (cache)"
+    : mwSource === "woz_x110" ? "WOZ ×1,10"
+    : altumMarkt ? "schatting"
+    : "AI-schatting";
   const afwijking = ((marktwaarde - vraag) / vraag) * 100;
   const afwColor = Math.abs(afwijking) < 5 ? "text-muted-foreground" : afwijking > 0 ? "text-positive" : "text-destructive";
 
