@@ -137,7 +137,7 @@ function VastgoedAI() {
   );
 }
 
-function EmptyState({ error, loading, onAnalyze }: { error: string | null; loading: boolean; onAnalyze: (q: string) => void }) {
+function EmptyState({ error, debug, loading, onAnalyze }: { error: string | null; debug: { logs: string[]; raw: unknown } | null; loading: boolean; onAnalyze: (q: string) => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (q.trim() && !loading) onAnalyze(q.trim()); };
   return (
