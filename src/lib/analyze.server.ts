@@ -11,6 +11,7 @@ export async function fetchPdok(query: string) {
   const ll = doc.centroide_ll?.match(/POINT\(([\-\d.]+) ([\-\d.]+)\)/);
   return {
     bagId: doc.adresseerbaarobject_id,
+    nummeraanduidingId: doc.nummeraanduiding_id,
     adres: doc.weergavenaam,
     postcode: doc.postcode,
     woonplaats: doc.woonplaatsnaam,
