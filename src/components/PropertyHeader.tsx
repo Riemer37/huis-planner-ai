@@ -1,6 +1,7 @@
-import { ExternalLink, MapPin } from "lucide-react";
+import { Download, ExternalLink, MapPin } from "lucide-react";
 import type { DataSource, PropertyAnalysis } from "@/lib/types";
 import { SourceBadge } from "./SourceBadge";
+import { exportAnalysisPdf } from "@/lib/exportPdf";
 
 const adviesStyle = (advies: string) => {
   if (advies === "Kopen") return "bg-positive/15 text-positive border-positive/40";
@@ -100,6 +101,9 @@ export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
                 <Pill><span className="inline-flex items-center gap-1 text-primary">BAG <ExternalLink className="size-3" /></span></Pill>
               </a>
             )}
+            <button onClick={() => exportAnalysisPdf(a)} className="print:hidden" aria-label="Download PDF dossier">
+              <Pill><span className="inline-flex items-center gap-1 text-primary">Download PDF <Download className="size-3" /></span></Pill>
+            </button>
           </div>
         </div>
 
