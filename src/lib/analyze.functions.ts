@@ -169,25 +169,33 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (primary) bronnen.push("Lovable AI");
     if (secondary) bronnen.push("Anthropic");
 
-    // Energielabel — Funda is primair, EP-online verificatie. NOOIT raden.
+    // Energielabel — STRIKT GESCHEIDEN bronnen.
+    // - Funda URL ingevoerd → ALLEEN Funda label (geen EP-online fallback). Mist het, dan handmatige invoer.
+    // - Adres ingevoerd → ALLEEN EP-online (officieel).
     if (listing?.funda_debug?.blocked) {
       errors.funda_blocked = "FUNDA BLOCKED — real page not returned";
     }
     const fundaLabelRaw = listing?.energielabel?.toUpperCase().trim();
     const fundaLabel = listing?.funda_debug?.blocked ? undefined : fundaLabelRaw;
     const epLabel = energie?.label?.toUpperCase().trim();
-    console.log(`[ENERGIELABEL] funda="${fundaLabel ?? ""}" ep_online="${epLabel ?? ""}" isUrl=${isUrl}`);
+    console.log(`[ENERGIELABEL] funda="${fundaLabel ?? ""}" ep_online="${epLabel ?? ""}" isUrl=${isUrl} hasManual=${hasManual}`);
     let energielabel: PropertyAnalysis["energielabel"];
-    const fundaBron = hasManual ? "Handmatig ingevoerd" : "Funda listing";
-    if (fundaLabel && epLabel) {
-      const conflict = fundaLabel !== epLabel;
-      energielabel = { label: fundaLabel, bron: fundaBron, label_secondary: epLabel, bron_secondary: "EP-online", conflict };
-    } else if (fundaLabel) {
-      energielabel = { label: fundaLabel, bron: fundaBron };
-    } else if (epLabel) {
-      energielabel = { label: epLabel, bron: "EP-online" };
+    if (hasManual && manual!.energielabel) {
+      energielabel = { label: manual!.energielabel.toUpperCase(), bron: "Handmatig", source_kind: "handmatig" };
+    } else if (isUrl) {
+      // Funda-pad — geen vermenging met EP-online
+      if (fundaLabel) {
+        energielabel = { label: fundaLabel, bron: "Funda", source_kind: "funda" };
+      } else {
+        energielabel = { label: "Onbekend", bron: "Niet gevonden op Funda — voer handmatig in", needs_manual: true, source_kind: "none" };
+      }
     } else {
-      energielabel = { label: "Onbekend", bron: isUrl ? "Niet gevonden in listing" : "Niet beschikbaar" };
+      // Adres-pad — alleen EP-online
+      if (epLabel) {
+        energielabel = { label: epLabel, bron: "EP-online (officieel)", source_kind: "ep_online" };
+      } else {
+        energielabel = { label: "Onbekend", bron: "Niet gevonden in EP-online — voer handmatig in", needs_manual: true, source_kind: "none" };
+      }
     }
     console.log(`[ENERGIELABEL] FINAL label="${energielabel.label}" bron="${energielabel.bron}"`);
 

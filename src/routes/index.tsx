@@ -124,7 +124,7 @@ function VastgoedAI() {
             </div>
             <div className="p-6 flex-1 bg-background">
               {tab === "overzicht" && <OverviewTab a={analysis} />}
-              {tab === "kadaster" && <KadasterTab a={analysis} />}
+              {tab === "kadaster" && <KadasterTab a={analysis} onUpdate={(next) => { saveAnalysis(next); setAnalysis(next); }} />}
               {tab === "potentieel" && <PotentialTab a={analysis} />}
               {tab === "aankoop" && <PurchaseTab a={analysis} />}
               {tab === "renovatie" && <RenovationTab a={analysis} />}
