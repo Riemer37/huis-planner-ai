@@ -234,6 +234,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : ((listing?.bron === "apify" || listing?.bron === "scraperapi") ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : (listing?.bron === "apify" || listing?.bron === "scraperapi") ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
       { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
+      { naam: "Altum AI WOZ-historie", data: altumWoz?.length ? `${altumWoz.length} jaren` : "—", status: altumWoz?.length ? "ok" : "estimate" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
     ];
 
@@ -251,9 +252,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       altum: altum ?? null,
       errors,
       bronnen,
-      woz: altum?.woz_geschat
-        ? synthesizeWoz(altum.woz_geschat * 1.1)
-        : synthesizeWoz(primary.marktwaarde_ai),
+      woz: altumWoz?.length
+        ? altumWoz
+        : altum?.woz_geschat
+          ? synthesizeWoz(altum.woz_geschat * 1.1)
+          : synthesizeWoz(primary.marktwaarde_ai),
       energielabel,
       is_apartment: isApt,
       perceel_m2: data.pandtype === "commercieel" || isApt ? undefined : (listing?.perceel_m2 ?? 120),
