@@ -19,8 +19,14 @@ function RiskBar({ label, value }: { label: string; value: number }) {
 export function OverviewTab({ a }: { a: PropertyAnalysis }) {
   const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
   const altumMarkt = a.altum?.marktwaarde;
+  const mwSource = a.altum?.marktwaarde_source;
   const marktwaarde = altumMarkt ?? a.ai.marktwaarde_ai;
-  const marktwaardeBron = altumMarkt ? "Altum AI" : "AI-schatting";
+  const marktwaardeBron =
+    mwSource === "altum_avm" ? "Altum AI"
+    : mwSource === "cached" ? "Altum AI (cache)"
+    : mwSource === "woz_x110" ? "WOZ ×1,10"
+    : altumMarkt ? "schatting"
+    : "AI-schatting";
   const afwijking = ((marktwaarde - vraag) / vraag) * 100;
   const afwColor = Math.abs(afwijking) < 5 ? "text-muted-foreground" : afwijking > 0 ? "text-positive" : "text-destructive";
 
@@ -64,15 +70,19 @@ export function OverviewTab({ a }: { a: PropertyAnalysis }) {
               <span className="text-muted-foreground">Marktwaarde ({marktwaardeBron})</span>
               <span className="inline-flex items-center gap-2">
                 {fmtEUR(marktwaarde)}
-                {altumMarkt && (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-positive/15 text-positive border border-positive/40">
-                    Altum AI
-                  </span>
+                {mwSource === "altum_avm" && (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-positive/15 text-positive border border-positive/40">Altum AI</span>
+                )}
+                {mwSource === "cached" && (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-muted text-foreground border">Cache 30d</span>
+                )}
+                {mwSource === "woz_x110" && (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-orange-500/15 text-orange-600 border border-orange-500/40">WOZ ×1,10 schatting</span>
                 )}
               </span>
             </div>
             <div className="flex justify-between"><span className="text-muted-foreground">Afwijking</span><span className={afwColor}>{fmtPct(afwijking)}</span></div>
-            <div className="text-[11px] text-muted-foreground pt-2">Methode: {altumMarkt ? "Altum AI AVM-model (real-time markttransacties)" : "AI-schatting (PDOK + WOZ-fallback)"}</div>
+            <div className="text-[11px] text-muted-foreground pt-2">Methode: {mwSource === "altum_avm" ? "Altum AI AVM-model (real-time markttransacties)" : mwSource === "cached" ? "Altum AI AVM, gecachte waarde (max 30 dagen oud)" : mwSource === "woz_x110" ? "WOZ-waarde ×1,10 (Altum AVM niet beschikbaar)" : "AI-schatting (PDOK + WOZ-fallback)"}</div>
           </div>
         </div>
 

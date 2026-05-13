@@ -7,12 +7,12 @@ import {
   cryptoRandomId,
   fallbackAI,
   fetchAltum,
-  fetchAltumWozHistory,
   fetchBagApi,
   fetchBagVbo,
   fetchEnergielabel,
   fetchPdok,
   fetchRijksmonument,
+  fetchWozWaardeloket,
   scrapeListing,
   synthesizeWoz,
 } from "./analyze.server";
@@ -39,6 +39,7 @@ const InputSchema = z.object({
   pandtype: z.enum(["woning", "nieuwbouw", "commercieel", "gemengd"]),
   isUrl: z.boolean().optional(),
   manualInput: ManualInputSchema,
+  cachedMarktwaarde: z.number().positive().optional(),
 });
 
 function extractHuisnummer(adres?: string): string | undefined {
@@ -121,7 +122,19 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const huisnummer = extractHuisnummer(pdok?.adres) ?? extractHuisnummer(addressForPdok);
 
     // Fase 2: parallelle data-ophaal
-    const [bagWfs, bagApi, monument, energie, altum, altumWoz] = await Promise.all([
+    // - Skip Altum AVM call wanneer client een gecachte marktwaarde meestuurt (1×/30d cache)
+    const altumPromise = data.cachedMarktwaarde
+      ? Promise.resolve({
+          bron: "altum_ai" as const,
+          marktwaarde: data.cachedMarktwaarde,
+          marktwaarde_source: "cached" as const,
+        })
+      : fetchAltum(pdok?.postcode, huisnummer).catch((e: any) => {
+          errors.altum = String(e?.message ?? e);
+          return null;
+        });
+
+    const [bagWfs, bagApi, monument, energie, altumRaw, wozReal] = await Promise.all([
       fetchBagVbo(pdok?.bagId).catch((e: any) => {
         errors.bag_wfs = String(e?.message ?? e);
         return null;
@@ -138,23 +151,34 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         errors.ep_online = String(e?.message ?? e);
         return null;
       }),
-      fetchAltum(pdok?.postcode, huisnummer).catch((e: any) => {
-        errors.altum = String(e?.message ?? e);
-        return null;
-      }),
-      fetchAltumWozHistory(pdok?.postcode, huisnummer).catch((e: any) => {
-        errors.altum_woz = String(e?.message ?? e);
+      altumPromise,
+      fetchWozWaardeloket(pdok?.nummeraanduidingId).catch((e: any) => {
+        errors.woz_loket = String(e?.message ?? e);
         return null;
       }),
     ]);
+
+    // Fallback marktwaarde via WOZ ×1,10 wanneer Altum gerate-limit is of geen waarde leverde
+    let altum: any = altumRaw;
+    if ((!altum || (altum as any)?.rate_limited || !altum?.marktwaarde) && wozReal && wozReal.length > 0) {
+      const latestWoz = wozReal[wozReal.length - 1].waarde;
+      altum = {
+        ...(altum ?? {}),
+        bron: "altum_ai" as const,
+        marktwaarde: Math.round(latestWoz * 1.1),
+        marktwaarde_source: "woz_x110" as const,
+      };
+    }
 
     const bag = bagApi ?? bagWfs;
     if (bagApi) bronnen.push("BAG API");
     else if (bagWfs) bronnen.push("BAG WFS");
     if (monument?.rijksmonument) bronnen.push("RCE Monumenten");
     if (energie) bronnen.push("EP Online");
-    if (altum) bronnen.push("Altum AI");
-    if (altumWoz?.length) bronnen.push("Altum AI WOZ-historie");
+    if (altum?.marktwaarde && altum?.marktwaarde_source === "altum_avm") bronnen.push("Altum AI AVM");
+    if (altum?.marktwaarde_source === "cached") bronnen.push("Marktwaarde (cache 30d)");
+    if (altum?.marktwaarde_source === "woz_x110") bronnen.push("WOZ ×1,10 fallback");
+    if (wozReal?.length) bronnen.push("WOZ Waardeloket");
 
     // Fase 3: AI primair (Lovable) + secundair (Anthropic) parallel
     const prompt = buildPrompt({
@@ -233,8 +257,8 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "EP-online energielabel", data: epLabel ?? "—", status: epLabel ? "ok" : "fail" },
       { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : ((listing?.bron === "apify" || listing?.bron === "scraperapi") ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : (listing?.bron === "apify" || listing?.bron === "scraperapi") ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
-      { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
-      { naam: "Altum AI WOZ-historie", data: altumWoz?.length ? `${altumWoz.length} jaren` : "—", status: altumWoz?.length ? "ok" : "estimate" },
+      { naam: "Marktwaarde", data: altum?.marktwaarde ? `€${altum.marktwaarde}${altum.marktwaarde_source === "woz_x110" ? " (WOZ ×1,10)" : altum.marktwaarde_source === "cached" ? " (cache)" : ""}` : "—", status: altum?.marktwaarde_source === "altum_avm" || altum?.marktwaarde_source === "cached" ? "ok" : altum?.marktwaarde ? "estimate" : "estimate" },
+      { naam: "WOZ Waardeloket (Kadaster)", data: wozReal?.length ? `${wozReal.length} jaren` : "—", status: wozReal?.length ? "ok" : "fail" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
     ];
 
@@ -252,8 +276,8 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       altum: altum ?? null,
       errors,
       bronnen,
-      woz: altumWoz?.length
-        ? altumWoz
+      woz: wozReal?.length
+        ? wozReal
         : altum?.woz_geschat
           ? synthesizeWoz(altum.woz_geschat * 1.1)
           : synthesizeWoz(primary.marktwaarde_ai),
