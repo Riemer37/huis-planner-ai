@@ -249,31 +249,17 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     };
   }
 
-  // Precise HTML regex extraction
+  // Precise HTML regex extraction. Price is extracted before any BVO/VVO parsing and kept independent.
   let prijsMatch: RegExpMatchArray | null =
     html.match(/["']price["']\s*:\s*(\d+)/) ??
     html.match(/vraagprijs[^€]*€\s*([\d.,]+)/i) ??
     html.match(/€\s*([\d.]+\.[\d]{3})/i);
+  let fibPrice: ReturnType<typeof extractFundaInBusinessPrice> = null;
 
   // Funda in Business heeft andere prijs-structuur (koopprijs / sellingPrice / "€ 3.600.000 k.k.")
   if (isFundaInBusiness) {
-    const fibPriceAnchors: RegExp[] = [
-      /"sellingPrice"\s*:\s*(\d+)/i,
-      /"price"\s*:\s*(\d+)/i,
-      /koopprijs[^\d€]*€?\s*([\d\.]+)/i,
-      /vraagprijs[^\d€]*€?\s*([\d\.]+)/i,
-      /€\s*([\d\.]+)\s*(?:k\.k\.|v\.o\.n\.|kosten\s*koper)/i,
-    ];
-    for (const re of fibPriceAnchors) {
-      const m = html.match(re);
-      if (m) {
-        const raw = parseInt(m[1].replace(/\./g, ""), 10);
-        if (raw >= 50_000 && raw <= 100_000_000) {
-          prijsMatch = m;
-          break;
-        }
-      }
-    }
+    fibPrice = extractFundaInBusinessPrice(html);
+    if (fibPrice) logs.push(`[FIB] prijs match (${fibPrice.source}) → ${fibPrice.value} (raw="${fibPrice.raw}")`);
   }
 
   // Funda migrated to Nuxt: JSON numbers like "livingArea": 33 are array-index pointers, NOT real values.
@@ -370,7 +356,8 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   }
 
   const regexResults: Record<string, string | number | null> = {
-    price: prijsMatch?.[1] ?? null,
+    price: fibPrice?.value ?? prijsMatch?.[1] ?? null,
+    fibPriceSource: fibPrice?.source ?? null,
     livingArea: woonoppervlakte,
     livingAreaKenmerken: m2Kenmerken?.[1] ?? null,
     livingAreaDesc: m2Desc?.[1] ?? null,
@@ -414,8 +401,9 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
 
   // Parse price from existing working source; all field values below use Nuxt-safe HTML anchors only.
   let vraagprijs: number | null =
-    (toNumber(nd?.price?.askingPrice ?? nd?.price?.salePrice ?? nd?.price ?? nd?.askingPrice) ??
-      (prijsMatch ? parseInt(prijsMatch[1].replace(/\./g, ""), 10) : null)) ?? null;
+    (fibPrice?.value ??
+      toNumber(nd?.price?.askingPrice ?? nd?.price?.salePrice ?? nd?.price ?? nd?.askingPrice) ??
+      (prijsMatch ? parseDutchWholeNumber(prijsMatch[1]) : null)) ?? null;
   let perceel: number | null = perceeloppervlakte;
   let kamers: number | null = aantalKamers;
 
