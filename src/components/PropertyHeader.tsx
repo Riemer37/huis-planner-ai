@@ -34,11 +34,12 @@ function ValuePill({ children, source }: { children: React.ReactNode; source?: D
 
 export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
   // LOCKED PRIORITY — DO NOT CHANGE WITHOUT EXPLICIT INSTRUCTION
-  // woonoppervlakte: BAG first → Altum AI second → Funda scraping last
+  // woonoppervlakte: Funda scraping first → BAG second → Altum AI last
   // bouwjaar: BAG first → Funda scraping second
   // energielabel: Funda (if URL given) → EP-online (if address given)
   // vraagprijs: Funda scraping only — no other source has this
-  const m2 = a.bag?.oppervlakte ?? a.altum?.oppervlakte ?? a.listing?.m2;
+  const fundaM2 = a.listing?.m2 && !a.listing.funda_debug?.blocked ? a.listing.m2 : undefined;
+  const m2 = fundaM2 ?? a.bag?.oppervlakte ?? a.altum?.oppervlakte;
   const bouwjaar = a.bag?.bouwjaar ?? a.listing?.bouwjaar;
   const label = a.energielabel?.label ?? a.listing?.energielabel ?? "—";
   const bagUrl = a.pdok?.bagId ? `https://bagviewer.kadaster.nl/lvbag/bag-viewer/?objectId=${a.pdok.bagId}` : null;
