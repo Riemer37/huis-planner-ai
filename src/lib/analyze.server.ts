@@ -283,8 +283,9 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   const regexResults: Record<string, string | number | null> = {
     price: prijsMatch?.[1] ?? null,
     livingArea: woonoppervlakte,
-    livingAreaPrimary: m2Primary?.[1] ?? null,
-    livingAreaFallback: m2Fallback?.[1] ?? null,
+    livingAreaKenmerken: m2Kenmerken?.[1] ?? null,
+    livingAreaDesc: m2Desc?.[1] ?? null,
+    livingAreaPill: m2Primary?.[1] ?? null,
     energyLabel: energielabel,
     constructionYear: bouwjaar,
     numberOfRooms: aantalKamers,
