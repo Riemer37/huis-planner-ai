@@ -60,8 +60,12 @@ export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
             {a.pdok?.adres ?? a.input}
           </h1>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <Pill><span className="capitalize">{a.pandtype}</span></Pill>
-            {m2 && <ValuePill source={a.field_sources?.living_area_m2}>{m2} m²</ValuePill>}
+            <Pill><span className="capitalize">{pandtypeLabel(a)}</span></Pill>
+            {m2 ? (
+              <ValuePill source={a.field_sources?.living_area_m2}>{m2} m²</ValuePill>
+            ) : (
+              <Pill><span className="text-muted-foreground">Oppervlakte onbekend</span></Pill>
+            )}
             {a.listing?.kamers && <ValuePill source={a.field_sources?.rooms}>{a.listing.kamers} kamers</ValuePill>}
             {bouwjaar && <ValuePill source={a.field_sources?.build_year}>Bouwjaar {bouwjaar}</ValuePill>}
             <ValuePill source={a.field_sources?.energy_label}><span className="text-gold font-semibold">Label {label}</span></ValuePill>
