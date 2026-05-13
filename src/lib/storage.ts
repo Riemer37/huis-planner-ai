@@ -68,6 +68,12 @@ export function findCached(input: string): PropertyAnalysis | undefined {
   return loadHistory().find((a) => a.input.toLowerCase() === input.toLowerCase());
 }
 
+export function clearCachedInput(input: string) {
+  if (typeof window === "undefined") return;
+  const list = loadHistory().filter((a) => !sameInput(a.input, input));
+  localStorage.setItem(KEY, JSON.stringify(list));
+}
+
 export function deleteAnalysis(id: string) {
   const list = loadHistory().filter((x) => x.id !== id);
   localStorage.setItem(KEY, JSON.stringify(list));
