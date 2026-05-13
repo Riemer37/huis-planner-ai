@@ -103,8 +103,11 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
     });
     const text = await r.text();
     console.log("[ALTUM/AVM] Response status:", r.status);
-    console.log("[ALTUM/AVM] Response body:", text.slice(0, 1000));
-    console.log("[ALTUM/AVM] Request body:", JSON.stringify(body), "key.len=", key.length);
+    console.log("[ALTUM/AVM] Response body:", text.slice(0, 600));
+    if (r.status === 429) {
+      // Rate-limit / quota op — laat caller fallback gebruiken
+      return { bron: "altum_ai" as const, rate_limited: true } as const;
+    }
     if (!r.ok) return null;
     let j: any = null;
     try { j = JSON.parse(text); } catch { return null; }
@@ -113,72 +116,64 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
       d?.InnerSurfaceArea ?? d?.inner_surface_area ?? d?.LivingArea ?? d?.living_area ??
       d?.SurfaceArea ?? d?.surface_area ?? d?.FloorArea ?? undefined;
     const bj = d?.BuildYear ?? d?.build_year ?? d?.YearOfConstruction ?? undefined;
-    console.log(`[ALTUM/AVM] opp=${opp} bj=${bj} avm=${d?.AVM} woz=${d?.WOZ}`);
+    const mw = d?.AVM ?? d?.market_value ?? d?.value ?? undefined;
     return {
       bron: "altum_ai" as const,
-      marktwaarde: d?.AVM ?? d?.market_value ?? d?.value ?? undefined,
+      marktwaarde: mw ? Number(mw) : undefined,
+      marktwaarde_source: mw ? ("altum_avm" as const) : undefined,
       woz_geschat: d?.WOZ ?? d?.woz_value ?? undefined,
       huurwaarde: d?.RentalValue ?? d?.rent ?? undefined,
       oppervlakte: opp ? Number(opp) : undefined,
       bouwjaar: bj ? Number(bj) : undefined,
     };
-  } catch {
+  } catch (e) {
+    console.log("[ALTUM/AVM] error:", (e as Error).message);
     return null;
   }
 }
 
-// ---------- Altum AI — WOZ historie (POST /woz) ----------
-// Docs: https://docs.altum.ai/woningdata/woz-api/authentication-input-and-response
-// Response: { Output: { wozvalue: [{ Date: "01-01-YYYY", Value: "123456" }] } }
-export async function fetchAltumWozHistory(
-  postcode?: string,
-  huisnummer?: string,
+// ---------- WOZ Waardeloket (Kadaster, gratis) ----------
+// Officieel publiek endpoint dat ook door wozwaardeloket.nl gebruikt wordt.
+export async function fetchWozWaardeloket(
+  nummeraanduidingId?: string,
 ): Promise<{ jaar: number; waarde: number }[] | null> {
-  const key = process.env.ALTUM_AI_API_KEY;
-  if (!key) { console.log("[ALTUM/WOZ] missing ALTUM_AI_API_KEY"); return null; }
-  if (!postcode || !huisnummer) { console.log("[ALTUM/WOZ] missing postcode/huisnummer", { postcode, huisnummer }); return null; }
+  if (!nummeraanduidingId) {
+    console.log("[WOZ-LOKET] missing nummeraanduidingId");
+    return null;
+  }
   try {
-    const pc = postcode.replace(/\s+/g, "").toUpperCase();
-    const body = { postcode: pc, housenumber: String(huisnummer), index: 1 };
-    const r = await fetch("https://api.altum.ai/woz", {
-      method: "POST",
-      headers: { "x-api-key": key, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const id = String(nummeraanduidingId).padStart(16, "0");
+    const url = `https://api.kadaster.nl/lvwoz/wozwaardeloket-api/v1/wozwaarde/nummeraanduiding/${id}`;
+    const r = await fetch(url, { headers: { Accept: "application/json" } });
     const text = await r.text();
-    console.log("[ALTUM/WOZ] Response status:", r.status);
-    console.log("[ALTUM/WOZ] Response body:", text.slice(0, 1500));
-    console.log("[ALTUM/WOZ] Request body:", JSON.stringify(body), "key.len=", key.length);
-    let j: any = null;
-    try { j = JSON.parse(text); } catch { return null; }
-    if (!r.ok || !j) return null;
-    const out = j?.Output ?? j?.output ?? j;
-    const list: any[] = Array.isArray(out?.wozvalue) ? out.wozvalue : [];
+    console.log("[WOZ-LOKET] status:", r.status, "url:", url);
+    if (!r.ok) {
+      console.log("[WOZ-LOKET] body:", text.slice(0, 400));
+      return null;
+    }
+    const j: any = JSON.parse(text);
+    const list: any[] = Array.isArray(j?.wozWaarden) ? j.wozWaarden : [];
     if (list.length === 0) {
-      console.log("[ALTUM/WOZ] no wozvalue array; raw=", JSON.stringify(out).slice(0, 300));
+      console.log("[WOZ-LOKET] no wozWaarden");
       return null;
     }
     const parsed = list
       .map((row) => {
-        const dateStr = String(row?.Date ?? row?.date ?? "");
+        const dateStr = String(row?.peildatum ?? "");
         const yearMatch = dateStr.match(/(\d{4})/);
         const jaar = yearMatch ? Number(yearMatch[1]) : NaN;
-        const valStr = String(row?.IndexedValue ?? row?.Value ?? row?.value ?? "");
-        const waarde = Number(valStr.replace(/[^\d]/g, ""));
+        const waarde = Number(row?.vastgesteldeWaarde);
         return { jaar, waarde };
       })
       .filter((e) => Number.isFinite(e.jaar) && Number.isFinite(e.waarde) && e.waarde > 0)
       .sort((a, b) => a.jaar - b.jaar);
     if (parsed.length === 0) return null;
-    // Pak laatste 5 jaren
     return parsed.slice(-5);
   } catch (e) {
-    console.log("[ALTUM/WOZ] error:", (e as Error).message);
+    console.log("[WOZ-LOKET] error:", (e as Error).message);
     return null;
   }
 }
-
-// ---------- ScraperAPI — Funda listing ----------
 function toNumber(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
