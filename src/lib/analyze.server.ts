@@ -396,7 +396,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   let kamers: number | null = aantalKamers;
 
   // Sanity checks
-  if (woonoppervlakte !== null && (woonoppervlakte < 10 || woonoppervlakte > 2000)) {
+  if (woonoppervlakte !== null && (woonoppervlakte < 10 || woonoppervlakte > (isFundaInBusiness ? 100_000 : 2000))) {
     logs.push(`[Validation] woonoppervlakte ${woonoppervlakte} out of range — discarded`);
     woonoppervlakte = null;
   }
