@@ -237,7 +237,10 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
       energielabel,
       bouwjaar,
       adres,
-      beschrijving: typeof first.description === "string" ? first.description : undefined,
+      beschrijving: [
+        typeof first.propertyType === "string" ? `Type: ${first.propertyType}` : null,
+        typeof first.description === "string" ? first.description : null,
+      ].filter(Boolean).join("\n\n") || undefined,
       bron: "apify",
       funda_debug: {
         html_length: text.length,
