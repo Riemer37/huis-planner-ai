@@ -232,14 +232,21 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
 
   // Funda migrated to Nuxt: JSON numbers like "livingArea": 33 are array-index pointers, NOT real values.
   // Never parse m²/field values from Nuxt JSON numbers; use anchored visible HTML only.
-  const m2Primary = html.match(/(\d{1,4})\s*m²\s*<\/span>\s*<span[^>]*>\s*wonen/i);
+  // PRIMARY: kenmerken table — most accurate (header pill is rounded)
   const wonenIdx = html.indexOf(">Wonen<");
-  let m2Fallback: RegExpMatchArray | null = null;
+  let m2Kenmerken: RegExpMatchArray | null = null;
   if (wonenIdx !== -1) {
     const chunk = html.substring(wonenIdx, wonenIdx + 300);
-    m2Fallback = chunk.match(/(\d{1,4})\s*m²/i);
+    m2Kenmerken = chunk.match(/(\d{1,4})(?:[.,]\d)?\s*m²/i);
   }
-  let woonoppervlakte = m2Primary ? parseInt(m2Primary[1]) : m2Fallback ? parseInt(m2Fallback[1]) : null;
+  // SECONDARY: description text (e.g. "72,7 m² woonoppervlakte" → 73)
+  const m2Desc = html.match(/(\d{1,4})(?:[.,]\d)?\s*m²\s*woonoppervlakte/i);
+  // FALLBACK: header pill (rounded)
+  const m2Primary = html.match(/(\d{1,4})\s*m²\s*<\/span>\s*<span[^>]*>\s*wonen/i);
+  let woonoppervlakte: number | null = null;
+  if (m2Kenmerken) woonoppervlakte = Math.round(parseFloat(m2Kenmerken[1].replace(",", ".")));
+  else if (m2Desc) woonoppervlakte = Math.round(parseFloat(m2Desc[1].replace(",", ".")));
+  else if (m2Primary) woonoppervlakte = parseInt(m2Primary[1]);
 
   const energyIdx = html.indexOf(">Energielabel<");
   let energielabel: string | null = null;
