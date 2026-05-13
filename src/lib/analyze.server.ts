@@ -803,12 +803,19 @@ export function fallbackAI(pandtype: import("./types").PandType): AiAnalysisShap
 }
 
 export function buildPrompt(ctx: any) {
+  const fib = ctx.isFundaInBusiness
+    ? `\nLET OP: Dit is een COMMERCIEEL pand van Funda in Business (kantoor/bedrijfsruimte/winkel).
+- Gebruik commerciële waarderingsmethodes: BAR (bruto aanvangsrendement) en NAR (netto aanvangsrendement), GEEN WWS-puntenstelsel.
+- Huurprijs uitdrukken als €/m²/jaar (commercieel_huurprijs_pm2), niet als maandhuur.
+- OVB is altijd 10,4% (geen 2% startersregeling).
+- Energielabel mag ontbreken — niet verplicht voor commercieel.\n`
+    : "";
   return `Analyseer dit pand voor een Nederlandse vastgoedbelegger en roep de tool 'analyse_pand' aan.
 
 Invoer: ${ctx.query}
-Soort invoer: ${ctx.isUrl ? "URL (Funda/Pararius/Vendr)" : "Adres"}
+Soort invoer: ${ctx.isUrl ? (ctx.isFundaInBusiness ? "URL (Funda in Business — commercieel)" : "URL (Funda/Pararius/Vendr)") : "Adres"}
 Pandtype (door gebruiker geselecteerd): ${ctx.pandtype}
-
+${fib}
 PDOK locatie: ${JSON.stringify(ctx.pdok ?? "onbekend")}
 BAG verblijfsobject: ${JSON.stringify(ctx.bag ?? "onbekend")}
 Monument/beschermd gezicht: ${JSON.stringify(ctx.monument)}
