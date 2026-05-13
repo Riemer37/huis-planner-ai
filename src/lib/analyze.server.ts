@@ -90,17 +90,23 @@ export async function fetchEnergielabel(postcode?: string, huisnummer?: string) 
 // ---------- Altum AI — WOZ-waarde / waarde-indicatie ----------
 export async function fetchAltum(postcode?: string, huisnummer?: string) {
   const key = process.env.ALTUM_AI_API_KEY;
-  if (!key || !postcode || !huisnummer) return null;
+  if (!key) { console.log("[ALTUM/AVM] missing ALTUM_AI_API_KEY"); return null; }
+  if (!postcode || !huisnummer) { console.log("[ALTUM/AVM] missing postcode/huisnummer", { postcode, huisnummer }); return null; }
   try {
     const pc = postcode.replace(/\s+/g, "").toUpperCase();
-    // Match endpoint accepteert post_code + house_number
+    const body = { postcode: pc, housenumber: String(huisnummer) };
     const r = await fetch("https://api.altum.ai/avm", {
       method: "POST",
       headers: { "x-api-key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ post_code: pc, house_number: Number(huisnummer) }),
+      body: JSON.stringify(body),
     });
+    const text = await r.text();
+    console.log("[ALTUM/AVM] Response status:", r.status);
+    console.log("[ALTUM/AVM] Response body:", text.slice(0, 1000));
+    console.log("[ALTUM/AVM] Request body:", JSON.stringify(body), "key.len=", key.length);
     if (!r.ok) return null;
-    const j: any = await r.json();
+    let j: any = null;
+    try { j = JSON.parse(text); } catch { return null; }
     const d = j?.Output ?? j?.data ?? j;
     const opp =
       d?.InnerSurfaceArea ?? d?.inner_surface_area ?? d?.LivingArea ?? d?.living_area ??
