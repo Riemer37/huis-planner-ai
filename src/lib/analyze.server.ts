@@ -335,7 +335,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
       blocked,
       raw_next_data: (nd ?? null) as JsonValue,
       raw_energy_label: labelMatch?.[1],
-      final_energy_label: energielabel,
+      final_energy_label: energielabel ?? undefined,
       html_regex_results: regexResults,
       logs,
       scraperapi_debug_output: logs,
