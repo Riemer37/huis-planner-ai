@@ -217,45 +217,88 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     };
   }
 
-  // HTML regex extraction (always)
-  const priceMatch = html.match(/€\s*([\d.]+(?:,\d+)?)/);
-  const bouwjaarMatch = html.match(/bouwjaar[^\d]*(\d{4})/i);
-  const kamersMatch = html.match(/(\d+)\s*kamers/i);
-  const m2Match = html.match(/(\d+)\s*m²?\s*(?:wonen|woonopp|woonoppervlakte)/i);
-  const perceelMatch = html.match(/(\d+)\s*m²?\s*(?:perceel|perceeloppervlakte)/i);
-  const labelMatch = html.match(/energielabel[^A-G]{0,40}([A-G][+]{0,4})/i);
+  // Precise HTML regex extraction
+  const prijsMatch =
+    html.match(/["']price["']\s*:\s*(\d+)/) ??
+    html.match(/vraagprijs[^€]*€\s*([\d.,]+)/i) ??
+    html.match(/€\s*([\d.]+\.[\d]{3})/i);
+  const m2Match =
+    html.match(/["']livingArea["']\s*:\s*(\d+)/) ??
+    html.match(/["']usableArea["']\s*:\s*(\d+)/) ??
+    html.match(/woonoppervlakte[\s\S]{0,50}?(\d{2,4})\s*m/i) ??
+    html.match(/(\d{2,4})\s*m²[\s\S]{0,30}?woon/i);
+  const labelMatch =
+    html.match(/["']energyLabel["']\s*:\s*["']([A-G][+]{0,3})["']/) ??
+    html.match(/["']energielabel["']\s*:\s*["']([A-G][+]{0,3})["']/) ??
+    html.match(/energie[^\n]{0,100}label[^\n]{0,50}["'\s>]([A-G][+]{0,3})["'\s<]/i);
+  const bouwjaarMatch =
+    html.match(/["']constructionYear["']\s*:\s*(\d{4})/) ??
+    html.match(/["']bouwjaar["']\s*:\s*(\d{4})/) ??
+    html.match(/bouwjaar[\s\S]{0,30}?(1[6-9]\d{2}|20[0-2]\d)/i);
+  const kamersMatch =
+    html.match(/["']numberOfRooms["']\s*:\s*(\d+)/) ??
+    html.match(/(\d+)\s*kamers/i);
+  const perceelMatch =
+    html.match(/["']plotArea["']\s*:\s*(\d+)/) ??
+    html.match(/perceeloppervlakte[\s\S]{0,50}?(\d{2,6})\s*m/i);
 
   const regexResults: Record<string, string | number | null> = {
-    price: priceMatch?.[1] ?? null,
-    bouwjaar: bouwjaarMatch?.[1] ?? null,
-    kamers: kamersMatch?.[1] ?? null,
-    m2: m2Match?.[1] ?? null,
-    perceel_m2: perceelMatch?.[1] ?? null,
-    energielabel: labelMatch?.[1] ?? null,
+    price: prijsMatch?.[1] ?? null,
+    livingArea: m2Match?.[1] ?? null,
+    energyLabel: labelMatch?.[1] ?? null,
+    constructionYear: bouwjaarMatch?.[1] ?? null,
+    numberOfRooms: kamersMatch?.[1] ?? null,
+    plotArea: perceelMatch?.[1] ?? null,
   };
-  logs.push(`[Regex] ${JSON.stringify(regexResults)}`);
+  logs.push(`[Regex raw] ${JSON.stringify(regexResults)}`);
+  logs.push(`[HTML first 2000] ${html.substring(0, 2000)}`);
 
   // Bonus: __NEXT_DATA__
   const { listing: nd, raw: ndRaw } = extractFromNextData(html);
   const nextDataFound = !!ndRaw;
   logs.push(`[NextData] found=${nextDataFound}`);
 
-  const prijs =
-    toNumber(nd?.price?.askingPrice ?? nd?.price?.salePrice ?? nd?.price ?? nd?.askingPrice) ??
-    toNumber(priceMatch?.[1]);
-  const m2 =
-    toNumber(nd?.floorArea ?? nd?.surfaceArea ?? nd?.livingArea ?? nd?.areas?.living) ??
-    toNumber(m2Match?.[1]);
-  const perceel =
-    toNumber(nd?.plotArea ?? nd?.parcelSurfaceArea ?? nd?.areas?.plot) ??
-    toNumber(perceelMatch?.[1]);
-  const kamers = toNumber(nd?.numberOfRooms ?? nd?.rooms) ?? toNumber(kamersMatch?.[1]);
-  const bouwjaar =
-    toNumber(nd?.constructionYear ?? nd?.yearBuilt ?? nd?.buildYear) ??
-    toNumber(bouwjaarMatch?.[1]);
-  const energielabel =
+  // Parse + prefer __NEXT_DATA__ when present, fallback to regex
+  let vraagprijs: number | null =
+    (toNumber(nd?.price?.askingPrice ?? nd?.price?.salePrice ?? nd?.price ?? nd?.askingPrice) ??
+      (prijsMatch ? parseInt(prijsMatch[1].replace(/\./g, ""), 10) : null)) ?? null;
+  let woonoppervlakte: number | null =
+    (toNumber(nd?.floorArea ?? nd?.livingArea ?? nd?.surfaceArea ?? nd?.areas?.living) ??
+      (m2Match ? parseInt(m2Match[1], 10) : null)) ?? null;
+  let perceel: number | null =
+    (toNumber(nd?.plotArea ?? nd?.parcelSurfaceArea ?? nd?.areas?.plot) ??
+      (perceelMatch ? parseInt(perceelMatch[1], 10) : null)) ?? null;
+  let kamers: number | null =
+    (toNumber(nd?.numberOfRooms ?? nd?.rooms) ??
+      (kamersMatch ? parseInt(kamersMatch[1], 10) : null)) ?? null;
+  let bouwjaar: number | null =
+    (toNumber(nd?.constructionYear ?? nd?.yearBuilt ?? nd?.buildYear) ??
+      (bouwjaarMatch ? parseInt(bouwjaarMatch[1], 10) : null)) ?? null;
+  let energielabel: string | null =
     normLabel(nd?.energyClass ?? nd?.energyLabel?.label ?? nd?.energyLabel) ??
-    normLabel(labelMatch?.[1]);
+    (labelMatch?.[1] ? labelMatch[1].toUpperCase() : null);
+
+  // Sanity checks
+  if (woonoppervlakte !== null && (woonoppervlakte < 10 || woonoppervlakte > 2000)) {
+    logs.push(`[Validation] woonoppervlakte ${woonoppervlakte} out of range — discarded`);
+    woonoppervlakte = null;
+  }
+  if (bouwjaar !== null && (bouwjaar < 1600 || bouwjaar > 2025)) {
+    logs.push(`[Validation] bouwjaar ${bouwjaar} out of range — discarded`);
+    bouwjaar = null;
+  }
+  if (kamers !== null && (kamers < 1 || kamers > 30)) {
+    logs.push(`[Validation] kamers ${kamers} out of range — discarded`);
+    kamers = null;
+  }
+  if (vraagprijs !== null && (vraagprijs < 10000 || vraagprijs > 50_000_000)) {
+    logs.push(`[Validation] vraagprijs ${vraagprijs} out of range — discarded`);
+    vraagprijs = null;
+  }
+  if (perceel !== null && (perceel < 5 || perceel > 1_000_000)) {
+    logs.push(`[Validation] perceel ${perceel} out of range — discarded`);
+    perceel = null;
+  }
 
   const adres =
     typeof nd?.address?.streetName === "string"
@@ -264,11 +307,15 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
         ? nd.title
         : undefined;
 
-  const blocked = html.length < 5_000 && !prijs && !energielabel;
+  const blocked = html.length < 5_000 && !vraagprijs && !energielabel;
 
   logs.push(
-    `[ScraperAPI ok] price=${prijs} m2=${m2} perceel=${perceel} kamers=${kamers} label=${energielabel} bouwjaar=${bouwjaar}`,
+    `[Final] price=${vraagprijs} m2=${woonoppervlakte} perceel=${perceel} kamers=${kamers} label=${energielabel} bouwjaar=${bouwjaar}`,
   );
+
+  const prijs = vraagprijs ?? undefined;
+  const m2 = woonoppervlakte ?? undefined;
+
 
   return {
     url: targetUrl,
