@@ -188,6 +188,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     let energielabel: PropertyAnalysis["energielabel"];
     if (hasManual && manual!.energielabel) {
       energielabel = { label: manual!.energielabel.toUpperCase(), bron: "Handmatig", source_kind: "handmatig" };
+    } else if (isFundaInBusiness) {
+      // Commercieel pand — energielabel vaak niet beschikbaar; niet gokken
+      energielabel = fundaLabel
+        ? { label: fundaLabel, bron: "Funda in Business", source_kind: "funda" }
+        : { label: "Niet beschikbaar", bron: "Energielabel niet vereist voor commercieel pand", source_kind: "none" };
     } else if (isUrl) {
       // Funda-pad — geen vermenging met EP-online
       if (fundaLabel) {
