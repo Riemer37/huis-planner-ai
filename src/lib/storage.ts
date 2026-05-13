@@ -74,6 +74,11 @@ export function clearCachedInput(input: string) {
   localStorage.setItem(KEY, JSON.stringify(list));
 }
 
+export function clearAllLocalStorageEntries() {
+  if (typeof window === "undefined") return;
+  localStorage.clear();
+}
+
 export function deleteAnalysis(id: string) {
   const list = loadHistory().filter((x) => x.id !== id);
   localStorage.setItem(KEY, JSON.stringify(list));

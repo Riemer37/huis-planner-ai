@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Search, Trash2, Building2, History } from "lucide-react";
 import type { PandType, PropertyAnalysis } from "@/lib/types";
-import { loadHistory, deleteAnalysis } from "@/lib/storage";
+import { clearAllLocalStorageEntries, loadHistory, deleteAnalysis } from "@/lib/storage";
 import { fmtEUR } from "@/lib/calculations";
 
 interface Props {
@@ -50,6 +50,11 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
   const submit = () => {
     if (!q.trim() || loading) return;
     onAnalyze(q.trim(), selectedPandtype);
+  };
+
+  const clearCache = () => {
+    clearAllLocalStorageEntries();
+    setHistory([]);
   };
 
   return (
@@ -108,6 +113,15 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {loading ? "Data ophalen…" : "Analyseer"}
+        </button>
+
+        <button
+          onClick={clearCache}
+          type="button"
+          className="w-full flex items-center justify-center gap-2 border border-border bg-muted text-foreground rounded-md py-2.5 text-sm font-semibold transition hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 active:scale-[0.99]"
+        >
+          <Trash2 className="size-4" />
+          Cache leegmaken
         </button>
 
         {loading && loadingStages && loadingStages.length > 0 && (
