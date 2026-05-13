@@ -253,6 +253,28 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   logs.push(`[Regex raw] ${JSON.stringify(regexResults)}`);
   logs.push(`[HTML first 2000] ${html.substring(0, 2000)}`);
 
+  // Diagnostic dumps for surface area debugging
+  const allM2Matches = [...html.matchAll(/(\d{2,4})\s*m²/gi)].map((m) => m[1]);
+  logs.push(`[ALL m² values] ${JSON.stringify(allM2Matches)}`);
+
+  const oppervlakteContext = [...html.matchAll(/.{50}oppervlakte.{50}/gi)]
+    .map((m) => m[0].replace(/\s+/g, " "))
+    .slice(0, 20);
+  logs.push(`[oppervlakte contexts] ${JSON.stringify(oppervlakteContext)}`);
+
+  const areaKeys = [...html.matchAll(/"([\w]*[Aa]rea[\w]*)"\s*:\s*(\d+)/g)].map(
+    (m) => `${m[1]}: ${m[2]}`,
+  );
+  logs.push(`[Area JSON keys] ${JSON.stringify(areaKeys)}`);
+
+  // Heuristic: pick the m² value that appears closest after "woon"/"wonen" keyword
+  const woonIdx = html.search(/woonoppervlakte|wonen|living\s*area/i);
+  if (woonIdx >= 0) {
+    const window = html.slice(woonIdx, woonIdx + 400);
+    const near = [...window.matchAll(/(\d{2,4})\s*m²/gi)].map((m) => parseInt(m[1], 10));
+    logs.push(`[m² near 'woon'] ${JSON.stringify(near)}`);
+  }
+
   // Bonus: __NEXT_DATA__
   const { listing: nd, raw: ndRaw } = extractFromNextData(html);
   const nextDataFound = !!ndRaw;
