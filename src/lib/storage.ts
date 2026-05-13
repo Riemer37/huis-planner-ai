@@ -21,6 +21,11 @@ function isCompleteEnoughForCache(a: PropertyAnalysis) {
   return !isUrl || hasValidVraagprijs(a);
 }
 
+function isKnownBrokenCachedResult(a: PropertyAnalysis) {
+  return BROKEN_FIB_URLS.some((url) => sameInput(a.input, url)) &&
+    (!hasValidVraagprijs(a) || a.ai?.marktwaarde_ai === 625_000);
+}
+
 export function loadHistory(): PropertyAnalysis[] {
   if (typeof window === "undefined") return [];
   try {
@@ -31,7 +36,7 @@ export function loadHistory(): PropertyAnalysis[] {
       (a) =>
         Date.now() - a.timestamp < TTL_MS &&
         isCompleteEnoughForCache(a) &&
-        !BROKEN_FIB_URLS.some((url) => sameInput(a.input, url)),
+        !isKnownBrokenCachedResult(a),
     );
     if (clean.length !== arr.length) localStorage.setItem(KEY, JSON.stringify(clean));
     return clean;
