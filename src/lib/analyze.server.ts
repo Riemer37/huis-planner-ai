@@ -288,11 +288,17 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
       const idx = html.indexOf(anchor);
       if (idx !== -1) {
         const chunk = html.substring(idx, idx + 300);
-        const match = chunk.match(/(\d{1,6})(?:[.,]\d+)?\s*m²/i);
+        // NL number format: "1.228,20" or "1228" — capture full number incl. thousand separators
+        const match = chunk.match(/(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,6}(?:,\d+)?)\s*m²/i);
         if (match) {
-          woonoppervlakte = Math.round(parseFloat(match[1].replace(",", ".")));
-          m2FibAnchor = anchor;
-          break;
+          const cleaned = match[1].replace(/\./g, "").replace(",", ".");
+          const n = parseFloat(cleaned);
+          if (Number.isFinite(n) && n >= 10 && n <= 100_000) {
+            woonoppervlakte = Math.round(n);
+            m2FibAnchor = anchor;
+            logs.push(`[FIB] anchor "${anchor}" → ${woonoppervlakte} m² (raw="${match[1]}")`);
+            break;
+          }
         }
       }
     }
@@ -444,7 +450,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
 
   const prijs = vraagprijs ?? undefined;
   const m2 = woonoppervlakte ?? undefined;
-
+  console.log(`[scrapeFunda] returning listing m2=${m2} prijs=${prijs} fibAnchor=${m2FibAnchor} url=${targetUrl}`);
 
   return {
     url: targetUrl,
