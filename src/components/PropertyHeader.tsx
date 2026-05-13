@@ -33,7 +33,8 @@ function ValuePill({ children, source }: { children: React.ReactNode; source?: D
 }
 
 export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
-  const m2 = a.listing?.m2 ?? a.bag?.oppervlakte;
+  // Priority: BAG (official) > Altum AI > Funda scraping
+  const m2 = a.bag?.oppervlakte ?? a.listing?.m2;
   const bouwjaar = a.bag?.bouwjaar ?? a.listing?.bouwjaar;
   const label = a.energielabel?.label ?? a.listing?.energielabel ?? "—";
   const bagUrl = a.pdok?.bagId ? `https://bagviewer.kadaster.nl/lvbag/bag-viewer/?objectId=${a.pdok.bagId}` : null;
