@@ -245,7 +245,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         adres: pdok ? "bag" : "schatting",
         woonplaats: pdok ? "bag" : "schatting",
         buurt: pdok?.buurt ? "bag" : "schatting",
-        living_area_m2: hasManual && manual!.living_area_m2 ? "handmatig" : altum?.oppervlakte ? "altum_ai" : listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
+        living_area_m2: hasManual && manual!.living_area_m2 ? "handmatig" : bag?.oppervlakte ? "bag" : altum?.oppervlakte ? "altum_ai" : listing?.m2 && !listing.funda_debug?.blocked ? "funda" : "schatting",
         plot_area_m2: hasManual && manual!.plot_area_m2 ? "handmatig" : isApt ? "bag" : listing?.perceel_m2 && !listing.funda_debug?.blocked ? "funda" : "schatting",
         build_year: hasManual && manual!.build_year ? "handmatig" : (bag as any)?.bouwjaar ? "bag" : listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : "schatting",
         rooms: hasManual && manual!.rooms ? "handmatig" : listing?.kamers && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
