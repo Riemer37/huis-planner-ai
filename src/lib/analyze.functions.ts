@@ -52,6 +52,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const errors: Record<string, string> = {};
     const bronnen: string[] = ["PDOK"];
     const isUrl = data.isUrl ?? /^https?:\/\//i.test(data.query);
+    const isFundaInBusiness = isUrl && /fundainbusiness\.nl/i.test(data.query);
+    // Funda in Business URL = altijd commercieel pand (server-side defense)
+    if (isFundaInBusiness && data.pandtype !== "commercieel") {
+      data = { ...data, pandtype: "commercieel" };
+    }
     const manual = data.manualInput;
     const hasManual = !!manual;
 
