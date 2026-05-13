@@ -59,6 +59,11 @@ export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Pill><span className="capitalize">{a.pandtype}</span></Pill>
             {m2 && <ValuePill source={a.field_sources?.living_area_m2}>{m2} m²</ValuePill>}
+            {bagM2Secondary && (
+              <span title="BAG-oppervlakte (gebruiksoppervlakte) kan afwijken van woonoppervlakte">
+                <Pill><span className="inline-flex items-center gap-1.5 text-muted-foreground">{bagM2Secondary} m² (BAG)</span></Pill>
+              </span>
+            )}
             {a.listing?.kamers && <ValuePill source={a.field_sources?.rooms}>{a.listing.kamers} kamers</ValuePill>}
             {bouwjaar && <ValuePill source={a.field_sources?.build_year}>Bouwjaar {bouwjaar}</ValuePill>}
             <ValuePill source={a.field_sources?.energy_label}><span className="text-gold font-semibold">Label {label}</span></ValuePill>
