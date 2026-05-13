@@ -92,7 +92,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       });
       if (scraped) {
         listing = scraped;
-        bronnen.push("Apify");
+        bronnen.push("ScraperAPI");
         if (scraped.adres) addressForPdok = scraped.adres;
       } else {
         listing = { url: data.query, bron: "manual" };
