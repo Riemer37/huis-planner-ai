@@ -34,7 +34,7 @@ const ManualInputSchema = z
   .optional();
 
 const InputSchema = z.object({
-  query: z.string().min(2).max(300),
+  query: z.string().trim().min(1).max(300),
   pandtype: z.enum(["woning", "nieuwbouw", "commercieel", "gemengd"]),
   isUrl: z.boolean().optional(),
   manualInput: ManualInputSchema,
