@@ -62,7 +62,7 @@ function VastgoedAI() {
     }
     setLoading(true);
     setStages([
-      "Funda ophalen via Apify…",
+      "Funda ophalen via ScraperAPI…",
       "PDOK locatie…",
       "BAG verblijfsobject…",
       "EP-online energielabel…",
@@ -74,7 +74,7 @@ function VastgoedAI() {
       })) as PropertyAnalysis;
       if (isUrl && result.listing?.funda_debug?.blocked) {
         setError(
-          "Apify kon de Funda-pagina niet ophalen. Zie debug-output hieronder.",
+          "ScraperAPI kon de Funda-pagina niet ophalen. Zie debug-output hieronder.",
         );
         setDebug({
           logs: result.listing?.funda_debug?.logs ?? [],
@@ -188,7 +188,7 @@ function EmptyState({ error, debug, loading, onAnalyze }: { error: string | null
         )}
         {debug && (
           <div className="mt-4 text-xs bg-muted border border-border rounded-md p-3 max-h-96 overflow-auto text-left font-mono">
-            <div className="font-bold mb-2">Apify debug</div>
+            <div className="font-bold mb-2">ScraperAPI debug</div>
             {debug.logs.map((l, i) => (
               <div key={i} className="whitespace-pre-wrap break-all">{l}</div>
             ))}
@@ -200,7 +200,7 @@ function EmptyState({ error, debug, loading, onAnalyze }: { error: string | null
 
         <div className="mt-8 grid grid-cols-3 gap-3 text-[11px]">
           {[
-            { k: "Apify · Funda", v: "Automatische scraping" },
+            { k: "ScraperAPI · Funda", v: "Automatische scraping" },
             { k: "PDOK · BAG · RCE", v: "Officiële databronnen" },
             { k: "Lovable AI Gateway", v: "Real-time analyse" },
           ].map((c) => (

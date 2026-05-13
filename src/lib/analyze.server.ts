@@ -113,10 +113,7 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
   }
 }
 
-// ---------- Apify — Funda listing ----------
-const APIFY_ENDPOINT =
-  "https://api.apify.com/v2/acts/nocodeventure~funda-scraper/run-sync-get-dataset-items";
-
+// ---------- ScraperAPI — Funda listing ----------
 function toNumber(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
@@ -133,138 +130,79 @@ function normLabel(v: unknown): string | undefined {
   return m ? m[0] : undefined;
 }
 
+const SCRAPER_HEADERS = {
+  "X-MyHeader-Accept-Language": "nl-NL,nl;q=0.9",
+  "X-MyHeader-Accept":
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+  "X-MyHeader-User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+};
+
+async function scraperApiFetch(
+  fundaUrl: string,
+  render: boolean,
+  timeoutMs: number,
+  logs: string[],
+): Promise<{ html: string; status: number } | null> {
+  const key = process.env.SCRAPER_API_KEY!;
+  const encodedUrl = encodeURIComponent(fundaUrl);
+  const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodedUrl}&render=${render}&premium=true&country_code=nl&device_type=desktop&keep_headers=true`;
+  const safeUrl = scraperUrl.replace(key, "[REDACTED]");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    logs.push(`[ScraperAPI] GET render=${render} timeout=${timeoutMs}ms`);
+    logs.push(`[ScraperAPI] URL: ${safeUrl}`);
+    const r = await fetch(scraperUrl, { headers: SCRAPER_HEADERS, signal: controller.signal });
+    const html = await r.text();
+    logs.push(`[ScraperAPI] status=${r.status} html_length=${html.length}`);
+    return { html, status: r.status };
+  } catch (e) {
+    const err = e as Error;
+    logs.push(`[ScraperAPI] error render=${render}: ${err.name === "AbortError" ? "TIMEOUT" : err.message}`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractFromNextData(html: string): { listing: any | null; raw: any | null } {
+  const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) return { listing: null, raw: null };
+  try {
+    const json = JSON.parse(m[1]);
+    const pp = json?.props?.pageProps ?? {};
+    const listing = pp.propertyResponse ?? pp.listing ?? pp;
+    return { listing, raw: json };
+  } catch {
+    return { listing: null, raw: null };
+  }
+}
+
 export async function scrapeListing(targetUrl: string): Promise<Listing | null> {
-  const key = process.env.APIFY_API_KEY;
-  console.log("API key present:", !!key);
+  const key = process.env.SCRAPER_API_KEY;
+  console.log("SCRAPER_API_KEY present:", !!key);
   if (!key) {
-    console.log("[APIFY] APIFY_API_KEY not set");
+    console.log("[ScraperAPI] SCRAPER_API_KEY not set");
     return null;
   }
   const logs: string[] = [];
-  const url = `${APIFY_ENDPOINT}?token=${encodeURIComponent(key)}&timeout=60`;
-  const safeUrl = `${APIFY_ENDPOINT}?token=[REDACTED]&timeout=60`;
-  const requestBody = {
-    urls: [{ url: targetUrl }],
-    maxResultsPerSearch: 1,
-  };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90_000);
-  try {
-    console.log("Apify request URL:", safeUrl);
-    console.log("Apify request body:", JSON.stringify(requestBody));
-    logs.push(`Apify endpoint: ${safeUrl}`);
-    logs.push(`Target URL: ${targetUrl}`);
-    logs.push(`Request body: ${JSON.stringify(requestBody)}`);
-    const r = await fetch(url, {
-      method: "POST",
-      signal: controller.signal,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-    console.log("Apify response status:", r.status);
-    logs.push(`Response status: ${r.status}`);
-    const text = await r.text();
-    console.log("Apify response body:", text.substring(0, 2000));
-    logs.push(`Response body (first 2000): ${text.substring(0, 2000)}`);
-    if (!r.ok) {
-      logs.push(`Response body (first 500): ${text.substring(0, 500)}`);
-      console.log(`[APIFY] HTTP ${r.status}: ${text.substring(0, 200)}`);
-      return {
-        url: targetUrl,
-        bron: "manual",
-        funda_debug: {
-          html_length: text.length,
-          next_data_found: false,
-          blocked: true,
-          raw_next_data: null,
-          logs,
-          scraperapi_debug_output: logs,
-        },
-      };
+
+  // Attempt 1: render=false
+  let result = await scraperApiFetch(targetUrl, false, 25_000, logs);
+  let html = result?.html ?? "";
+
+  // Retry with render=true if too small
+  if (html.length < 50_000) {
+    logs.push(`[ScraperAPI] html too small (${html.length}) — retry with render=true`);
+    const retry = await scraperApiFetch(targetUrl, true, 25_000, logs);
+    if (retry && retry.html.length > html.length) {
+      result = retry;
+      html = retry.html;
     }
-    let data: any;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      logs.push(`JSON parse error: ${(e as Error).message}`);
-      logs.push(`Body (first 500): ${text.substring(0, 500)}`);
-      return {
-        url: targetUrl,
-        bron: "manual",
-        funda_debug: {
-          html_length: text.length,
-          next_data_found: false,
-          blocked: true,
-          raw_next_data: null,
-          logs,
-          scraperapi_debug_output: logs,
-        },
-      };
-    }
-    const first = Array.isArray(data) ? data[0] : null;
-    if (!first || typeof first !== "object") {
-      logs.push(`Empty dataset (length=${Array.isArray(data) ? data.length : "n/a"})`);
-      return {
-        url: targetUrl,
-        bron: "manual",
-        funda_debug: {
-          html_length: text.length,
-          next_data_found: false,
-          blocked: true,
-          raw_next_data: null,
-          logs,
-          scraperapi_debug_output: logs,
-        },
-      };
-    }
+  }
 
-    const prijs = toNumber(first.price);
-    const m2 = toNumber(first.surfaceArea);
-    const perceel = toNumber(first.parcelSurfaceArea);
-    const kamers = toNumber(first.numberOfRooms);
-    const energielabel = normLabel(first.energyClass);
-    const bouwjaar = toNumber(first.yearBuilt ?? first.buildYear ?? first.constructionYear);
-
-    const titleParts: string[] = [];
-    if (typeof first.title === "string") titleParts.push(first.title);
-    if (typeof first.postalCode === "string") titleParts.push(first.postalCode);
-    if (typeof first.city === "string") titleParts.push(first.city);
-    const adres = titleParts.length ? titleParts.join(", ") : undefined;
-
-    logs.push(
-      `Apify ok: price=${prijs} m2=${m2} perceel=${perceel} kamers=${kamers} label=${energielabel} bouwjaar=${bouwjaar} adres=${adres}`,
-    );
-
-    return {
-      url: targetUrl,
-      prijs,
-      vraagprijs: prijs,
-      m2,
-      perceel_m2: perceel,
-      kamers,
-      energielabel,
-      bouwjaar,
-      adres,
-      beschrijving: [
-        typeof first.propertyType === "string" ? `Type: ${first.propertyType}` : null,
-        typeof first.description === "string" ? first.description : null,
-      ].filter(Boolean).join("\n\n") || undefined,
-      bron: "apify",
-      funda_debug: {
-        html_length: text.length,
-        next_data_found: true,
-        blocked: false,
-        raw_next_data: first as JsonValue,
-        final_energy_label: energielabel,
-        logs,
-        scraperapi_debug_output: logs,
-      },
-    };
-  } catch (e) {
-    const err = e as Error;
-    const aborted = err.name === "AbortError";
-    logs.push(aborted ? "TIMEOUT after 90000ms" : `Error: ${err.message}`);
-    console.log("[APIFY] error:", err.message);
+  if (!html) {
     return {
       url: targetUrl,
       bron: "manual",
@@ -277,9 +215,85 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
         scraperapi_debug_output: logs,
       },
     };
-  } finally {
-    clearTimeout(timer);
   }
+
+  // HTML regex extraction (always)
+  const priceMatch = html.match(/€\s*([\d.]+(?:,\d+)?)/);
+  const bouwjaarMatch = html.match(/bouwjaar[^\d]*(\d{4})/i);
+  const kamersMatch = html.match(/(\d+)\s*kamers/i);
+  const m2Match = html.match(/(\d+)\s*m²?\s*(?:wonen|woonopp|woonoppervlakte)/i);
+  const perceelMatch = html.match(/(\d+)\s*m²?\s*(?:perceel|perceeloppervlakte)/i);
+  const labelMatch = html.match(/energielabel[^A-G]{0,40}([A-G][+]{0,4})/i);
+
+  const regexResults: Record<string, string | number | null> = {
+    price: priceMatch?.[1] ?? null,
+    bouwjaar: bouwjaarMatch?.[1] ?? null,
+    kamers: kamersMatch?.[1] ?? null,
+    m2: m2Match?.[1] ?? null,
+    perceel_m2: perceelMatch?.[1] ?? null,
+    energielabel: labelMatch?.[1] ?? null,
+  };
+  logs.push(`[Regex] ${JSON.stringify(regexResults)}`);
+
+  // Bonus: __NEXT_DATA__
+  const { listing: nd, raw: ndRaw } = extractFromNextData(html);
+  const nextDataFound = !!ndRaw;
+  logs.push(`[NextData] found=${nextDataFound}`);
+
+  const prijs =
+    toNumber(nd?.price?.askingPrice ?? nd?.price?.salePrice ?? nd?.price ?? nd?.askingPrice) ??
+    toNumber(priceMatch?.[1]);
+  const m2 =
+    toNumber(nd?.floorArea ?? nd?.surfaceArea ?? nd?.livingArea ?? nd?.areas?.living) ??
+    toNumber(m2Match?.[1]);
+  const perceel =
+    toNumber(nd?.plotArea ?? nd?.parcelSurfaceArea ?? nd?.areas?.plot) ??
+    toNumber(perceelMatch?.[1]);
+  const kamers = toNumber(nd?.numberOfRooms ?? nd?.rooms) ?? toNumber(kamersMatch?.[1]);
+  const bouwjaar =
+    toNumber(nd?.constructionYear ?? nd?.yearBuilt ?? nd?.buildYear) ??
+    toNumber(bouwjaarMatch?.[1]);
+  const energielabel =
+    normLabel(nd?.energyClass ?? nd?.energyLabel?.label ?? nd?.energyLabel) ??
+    normLabel(labelMatch?.[1]);
+
+  const adres =
+    typeof nd?.address?.streetName === "string"
+      ? `${nd.address.streetName} ${nd.address.houseNumber ?? ""}`.trim()
+      : typeof nd?.title === "string"
+        ? nd.title
+        : undefined;
+
+  const blocked = html.length < 5_000 && !prijs && !energielabel;
+
+  logs.push(
+    `[ScraperAPI ok] price=${prijs} m2=${m2} perceel=${perceel} kamers=${kamers} label=${energielabel} bouwjaar=${bouwjaar}`,
+  );
+
+  return {
+    url: targetUrl,
+    prijs,
+    vraagprijs: prijs,
+    m2,
+    perceel_m2: perceel,
+    kamers,
+    energielabel,
+    bouwjaar,
+    adres,
+    beschrijving: typeof nd?.description === "string" ? nd.description : undefined,
+    bron: "scraperapi",
+    funda_debug: {
+      html_length: html.length,
+      next_data_found: nextDataFound,
+      blocked,
+      raw_next_data: (nd ?? null) as JsonValue,
+      raw_energy_label: labelMatch?.[1],
+      final_energy_label: energielabel,
+      html_regex_results: regexResults,
+      logs,
+      scraperapi_debug_output: logs,
+    },
+  };
 }
 
 function isEnergyLabelValue(value: unknown): value is string {
