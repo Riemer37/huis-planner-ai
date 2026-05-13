@@ -244,7 +244,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   const energyIdx = html.indexOf(">Energielabel<");
   let energielabel: string | null = null;
   if (energyIdx !== -1) {
-    const chunk = html.substring(energyIdx, energyIdx + 200);
+    const chunk = html.substring(energyIdx, energyIdx + 500);
     const match = chunk.match(/([A-G][+]{0,3})\s*</);
     energielabel = match?.[1] ?? null;
   }
@@ -252,7 +252,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   const bouwjaarIdx = html.indexOf(">Bouwjaar<");
   let bouwjaar: number | null = null;
   if (bouwjaarIdx !== -1) {
-    const chunk = html.substring(bouwjaarIdx, bouwjaarIdx + 100);
+    const chunk = html.substring(bouwjaarIdx, bouwjaarIdx + 200);
     const match = chunk.match(/(1[6-9]\d{2}|20[0-2]\d)/);
     bouwjaar = match ? parseInt(match[1]) : null;
   }
@@ -260,7 +260,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   const kamersIdx = html.indexOf(">Aantal kamers<");
   let aantalKamers: number | null = null;
   if (kamersIdx !== -1) {
-    const chunk = html.substring(kamersIdx, kamersIdx + 100);
+    const chunk = html.substring(kamersIdx, kamersIdx + 200);
     const match = chunk.match(/(\d+)\s*kamer/) ?? chunk.match(/>(\d+)</);
     aantalKamers = match ? parseInt(match[1]) : null;
   }
