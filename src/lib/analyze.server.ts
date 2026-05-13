@@ -289,18 +289,23 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   }
 
   // Funda in Business — fallback: BVO/VVO genoemd in beschrijvingstekst (NL-getal: "1.228,20")
+  // Tolerant voor HTML entities (m&sup2;, m&#178;), NBSP en "m2" zonder superscript.
   if (isFundaInBusiness && woonoppervlakte === null) {
+    const M2 = String.raw`(?:m²|m\s*2|m&sup2;|m&#178;|m&#xB2;)`;
+    const NUM = String.raw`([\d][\d.\u00a0\s]*(?:,\d+)?)`;
     const bvoMatch =
-      html.match(/([\d.]+(?:,\d+)?)\s*m²\s*BVO/i) ??
-      html.match(/([\d.]+(?:,\d+)?)\s*m²\s*VVO/i) ??
-      html.match(/vloeroppervlak[^\d]*([\d.]+(?:,\d+)?)\s*m²/i) ??
-      html.match(/totaal[^\d]*([\d.]+(?:,\d+)?)\s*m²/i);
+      html.match(new RegExp(`${NUM}\\s*${M2}[\\s\\S]{0,40}?\\bBVO\\b`, "i")) ??
+      html.match(new RegExp(`${NUM}\\s*${M2}[\\s\\S]{0,40}?\\bVVO\\b`, "i")) ??
+      html.match(new RegExp(`vloeroppervlak[\\s\\S]{0,40}?${NUM}\\s*${M2}`, "i")) ??
+      html.match(new RegExp(`oppervlakte[\\s\\S]{0,40}?${NUM}\\s*${M2}`, "i")) ??
+      html.match(new RegExp(`totaal[\\s\\S]{0,40}?${NUM}\\s*${M2}`, "i"));
     if (bvoMatch) {
-      const cleaned = bvoMatch[1].replace(/\./g, "").replace(",", ".");
+      const cleaned = bvoMatch[1].replace(/[\s\u00a0]/g, "").replace(/\./g, "").replace(",", ".");
       const n = parseFloat(cleaned);
-      if (Number.isFinite(n) && n > 0 && n < 1_000_000) {
+      if (Number.isFinite(n) && n >= 10 && n <= 100_000) {
         woonoppervlakte = Math.round(n);
         m2FibAnchor = "description-BVO/VVO";
+        logs.push(`[FIB] BVO/VVO description match → ${woonoppervlakte} m² (raw="${bvoMatch[1]}")`);
       }
     }
   }
