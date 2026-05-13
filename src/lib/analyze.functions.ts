@@ -39,6 +39,7 @@ const InputSchema = z.object({
   pandtype: z.enum(["woning", "nieuwbouw", "commercieel", "gemengd"]),
   isUrl: z.boolean().optional(),
   manualInput: ManualInputSchema,
+  cachedMarktwaarde: z.number().positive().optional(),
 });
 
 function extractHuisnummer(adres?: string): string | undefined {
