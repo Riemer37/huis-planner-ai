@@ -135,29 +135,37 @@ function normLabel(v: unknown): string | undefined {
 
 export async function scrapeListing(targetUrl: string): Promise<Listing | null> {
   const key = process.env.APIFY_API_KEY;
+  console.log("API key present:", !!key);
   if (!key) {
     console.log("[APIFY] APIFY_API_KEY not set");
     return null;
   }
   const logs: string[] = [];
-  const url = `${APIFY_ENDPOINT}?token=${encodeURIComponent(key)}`;
-  const safeUrl = `${APIFY_ENDPOINT}?token=[REDACTED]`;
+  const url = `${APIFY_ENDPOINT}?token=${encodeURIComponent(key)}&timeout=60`;
+  const safeUrl = `${APIFY_ENDPOINT}?token=[REDACTED]&timeout=60`;
+  const requestBody = {
+    urls: [{ url: targetUrl }],
+    maxResultsPerSearch: 1,
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90_000);
   try {
+    console.log("Apify request URL:", safeUrl);
+    console.log("Apify request body:", JSON.stringify(requestBody));
     logs.push(`Apify endpoint: ${safeUrl}`);
     logs.push(`Target URL: ${targetUrl}`);
+    logs.push(`Request body: ${JSON.stringify(requestBody)}`);
     const r = await fetch(url, {
       method: "POST",
       signal: controller.signal,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        urls: [{ url: targetUrl }],
-        maxResultsPerSearch: 1,
-      }),
+      body: JSON.stringify(requestBody),
     });
+    console.log("Apify response status:", r.status);
     logs.push(`Response status: ${r.status}`);
     const text = await r.text();
+    console.log("Apify response body:", text.substring(0, 2000));
+    logs.push(`Response body (first 2000): ${text.substring(0, 2000)}`);
     if (!r.ok) {
       logs.push(`Response body (first 500): ${text.substring(0, 500)}`);
       console.log(`[APIFY] HTTP ${r.status}: ${text.substring(0, 200)}`);
