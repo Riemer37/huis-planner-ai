@@ -229,33 +229,59 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     html.match(/["']price["']\s*:\s*(\d+)/) ??
     html.match(/vraagprijs[^€]*€\s*([\d.,]+)/i) ??
     html.match(/€\s*([\d.]+\.[\d]{3})/i);
-  const m2Match =
-    html.match(/["']livingArea["']\s*:\s*(\d+)/) ??
-    html.match(/["']usableArea["']\s*:\s*(\d+)/) ??
-    html.match(/woonoppervlakte[\s\S]{0,50}?(\d{2,4})\s*m/i) ??
-    html.match(/(\d{2,4})\s*m²[\s\S]{0,30}?woon/i);
-  const labelMatch =
-    html.match(/["']energyLabel["']\s*:\s*["']([A-G][+]{0,3})["']/) ??
-    html.match(/["']energielabel["']\s*:\s*["']([A-G][+]{0,3})["']/) ??
-    html.match(/energie[^\n]{0,100}label[^\n]{0,50}["'\s>]([A-G][+]{0,3})["'\s<]/i);
-  const bouwjaarMatch =
-    html.match(/["']constructionYear["']\s*:\s*(\d{4})/) ??
-    html.match(/["']bouwjaar["']\s*:\s*(\d{4})/) ??
-    html.match(/bouwjaar[\s\S]{0,30}?(1[6-9]\d{2}|20[0-2]\d)/i);
-  const kamersMatch =
-    html.match(/["']numberOfRooms["']\s*:\s*(\d+)/) ??
-    html.match(/(\d+)\s*kamers/i);
-  const perceelMatch =
-    html.match(/["']plotArea["']\s*:\s*(\d+)/) ??
-    html.match(/perceeloppervlakte[\s\S]{0,50}?(\d{2,6})\s*m/i);
+
+  // Funda migrated to Nuxt: JSON numbers like "livingArea": 33 are array-index pointers, NOT real values.
+  // Never parse m²/field values from Nuxt JSON numbers; use anchored visible HTML only.
+  const m2Primary = html.match(/(\d{1,4})\s*m²\s*<\/span>\s*<span[^>]*>\s*wonen/i);
+  const wonenIdx = html.indexOf(">Wonen<");
+  let m2Fallback: RegExpMatchArray | null = null;
+  if (wonenIdx !== -1) {
+    const chunk = html.substring(wonenIdx, wonenIdx + 300);
+    m2Fallback = chunk.match(/(\d{1,4})\s*m²/i);
+  }
+  const woonoppervlakte = m2Primary ? parseInt(m2Primary[1]) : m2Fallback ? parseInt(m2Fallback[1]) : null;
+
+  const energyIdx = html.indexOf(">Energielabel<");
+  let energielabel: string | null = null;
+  if (energyIdx !== -1) {
+    const chunk = html.substring(energyIdx, energyIdx + 200);
+    const match = chunk.match(/([A-G][+]{0,3})\s*</);
+    energielabel = match?.[1] ?? null;
+  }
+
+  const bouwjaarIdx = html.indexOf(">Bouwjaar<");
+  let bouwjaar: number | null = null;
+  if (bouwjaarIdx !== -1) {
+    const chunk = html.substring(bouwjaarIdx, bouwjaarIdx + 100);
+    const match = chunk.match(/(1[6-9]\d{2}|20[0-2]\d)/);
+    bouwjaar = match ? parseInt(match[1]) : null;
+  }
+
+  const kamersIdx = html.indexOf(">Aantal kamers<");
+  let aantalKamers: number | null = null;
+  if (kamersIdx !== -1) {
+    const chunk = html.substring(kamersIdx, kamersIdx + 100);
+    const match = chunk.match(/(\d+)\s*kamer/) ?? chunk.match(/>(\d+)</);
+    aantalKamers = match ? parseInt(match[1]) : null;
+  }
+
+  const perceelIdx = html.indexOf(">Perceel<");
+  let perceeloppervlakte: number | null = null;
+  if (perceelIdx !== -1) {
+    const chunk = html.substring(perceelIdx, perceelIdx + 200);
+    const match = chunk.match(/(\d{1,6})\s*m²/i);
+    perceeloppervlakte = match ? parseInt(match[1]) : null;
+  }
 
   const regexResults: Record<string, string | number | null> = {
     price: prijsMatch?.[1] ?? null,
-    livingArea: m2Match?.[1] ?? null,
-    energyLabel: labelMatch?.[1] ?? null,
-    constructionYear: bouwjaarMatch?.[1] ?? null,
-    numberOfRooms: kamersMatch?.[1] ?? null,
-    plotArea: perceelMatch?.[1] ?? null,
+    livingArea: woonoppervlakte,
+    livingAreaPrimary: m2Primary?.[1] ?? null,
+    livingAreaFallback: m2Fallback?.[1] ?? null,
+    energyLabel: energielabel,
+    constructionYear: bouwjaar,
+    numberOfRooms: aantalKamers,
+    plotArea: perceeloppervlakte,
   };
   logs.push(`[Regex raw] ${JSON.stringify(regexResults)}`);
   logs.push(`[HTML first 2000] ${html.substring(0, 2000)}`);
@@ -287,25 +313,12 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   const nextDataFound = !!ndRaw;
   logs.push(`[NextData] found=${nextDataFound}`);
 
-  // Parse + prefer __NEXT_DATA__ when present, fallback to regex
+  // Parse price from existing working source; all field values below use Nuxt-safe HTML anchors only.
   let vraagprijs: number | null =
     (toNumber(nd?.price?.askingPrice ?? nd?.price?.salePrice ?? nd?.price ?? nd?.askingPrice) ??
       (prijsMatch ? parseInt(prijsMatch[1].replace(/\./g, ""), 10) : null)) ?? null;
-  let woonoppervlakte: number | null =
-    (toNumber(nd?.floorArea ?? nd?.livingArea ?? nd?.surfaceArea ?? nd?.areas?.living) ??
-      (m2Match ? parseInt(m2Match[1], 10) : null)) ?? null;
-  let perceel: number | null =
-    (toNumber(nd?.plotArea ?? nd?.parcelSurfaceArea ?? nd?.areas?.plot) ??
-      (perceelMatch ? parseInt(perceelMatch[1], 10) : null)) ?? null;
-  let kamers: number | null =
-    (toNumber(nd?.numberOfRooms ?? nd?.rooms) ??
-      (kamersMatch ? parseInt(kamersMatch[1], 10) : null)) ?? null;
-  let bouwjaar: number | null =
-    (toNumber(nd?.constructionYear ?? nd?.yearBuilt ?? nd?.buildYear) ??
-      (bouwjaarMatch ? parseInt(bouwjaarMatch[1], 10) : null)) ?? null;
-  let energielabel: string | null =
-    normLabel(nd?.energyClass ?? nd?.energyLabel?.label ?? nd?.energyLabel) ??
-    (labelMatch?.[1] ? labelMatch[1].toUpperCase() : null);
+  let perceel: number | null = perceeloppervlakte;
+  let kamers: number | null = aantalKamers;
 
   // Sanity checks
   if (woonoppervlakte !== null && (woonoppervlakte < 10 || woonoppervlakte > 2000)) {
