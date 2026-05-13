@@ -18,7 +18,10 @@ function RiskBar({ label, value }: { label: string; value: number }) {
 
 export function OverviewTab({ a }: { a: PropertyAnalysis }) {
   const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
-  const afwijking = ((a.ai.marktwaarde_ai - vraag) / vraag) * 100;
+  const altumMarkt = a.altum?.marktwaarde;
+  const marktwaarde = altumMarkt ?? a.ai.marktwaarde_ai;
+  const marktwaardeBron = altumMarkt ? "Altum AI" : "AI-schatting";
+  const afwijking = ((marktwaarde - vraag) / vraag) * 100;
   const afwColor = Math.abs(afwijking) < 5 ? "text-muted-foreground" : afwijking > 0 ? "text-positive" : "text-destructive";
 
   return (
@@ -57,9 +60,19 @@ export function OverviewTab({ a }: { a: PropertyAnalysis }) {
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Prijs-validatie</div>
           <div className="space-y-1 text-sm tabular">
             <div className="flex justify-between"><span className="text-muted-foreground">Vraagprijs</span><span>{fmtEUR(a.listing?.prijs)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Marktwaarde (AI)</span><span>{fmtEUR(a.ai.marktwaarde_ai)}</span></div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Marktwaarde ({marktwaardeBron})</span>
+              <span className="inline-flex items-center gap-2">
+                {fmtEUR(marktwaarde)}
+                {altumMarkt && (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-positive/15 text-positive border border-positive/40">
+                    Altum AI
+                  </span>
+                )}
+              </span>
+            </div>
             <div className="flex justify-between"><span className="text-muted-foreground">Afwijking</span><span className={afwColor}>{fmtPct(afwijking)}</span></div>
-            <div className="text-[11px] text-muted-foreground pt-2">Methode: AI-schatting (PDOK + WOZ-fallback)</div>
+            <div className="text-[11px] text-muted-foreground pt-2">Methode: {altumMarkt ? "Altum AI AVM-model (real-time markttransacties)" : "AI-schatting (PDOK + WOZ-fallback)"}</div>
           </div>
         </div>
 

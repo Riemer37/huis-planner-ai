@@ -106,7 +106,7 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
       d?.InnerSurfaceArea ?? d?.inner_surface_area ?? d?.LivingArea ?? d?.living_area ??
       d?.SurfaceArea ?? d?.surface_area ?? d?.FloorArea ?? undefined;
     const bj = d?.BuildYear ?? d?.build_year ?? d?.YearOfConstruction ?? undefined;
-    console.log(`[ALTUM] opp=${opp} bj=${bj} avm=${d?.AVM} woz=${d?.WOZ}`);
+    console.log(`[ALTUM/AVM] opp=${opp} bj=${bj} avm=${d?.AVM} woz=${d?.WOZ}`);
     return {
       bron: "altum_ai" as const,
       marktwaarde: d?.AVM ?? d?.market_value ?? d?.value ?? undefined,
@@ -116,6 +116,51 @@ export async function fetchAltum(postcode?: string, huisnummer?: string) {
       bouwjaar: bj ? Number(bj) : undefined,
     };
   } catch {
+    return null;
+  }
+}
+
+// ---------- Altum AI — WOZ historie (POST /woz) ----------
+// Docs: https://docs.altum.ai/woningdata/woz-api/authentication-input-and-response
+// Response: { Output: { wozvalue: [{ Date: "01-01-YYYY", Value: "123456" }] } }
+export async function fetchAltumWozHistory(
+  postcode?: string,
+  huisnummer?: string,
+): Promise<{ jaar: number; waarde: number }[] | null> {
+  const key = process.env.ALTUM_AI_API_KEY;
+  if (!key || !postcode || !huisnummer) return null;
+  try {
+    const pc = postcode.replace(/\s+/g, "").toUpperCase();
+    const r = await fetch("https://api.altum.ai/woz", {
+      method: "POST",
+      headers: { "x-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ postcode: pc, housenumber: String(huisnummer), index: 1 }),
+    });
+    const j: any = await r.json().catch(() => null);
+    console.log(`[ALTUM/WOZ] status=${r.status} keys=${j ? Object.keys(j).join(",") : "(none)"}`);
+    if (!r.ok || !j) return null;
+    const out = j?.Output ?? j?.output ?? j;
+    const list: any[] = Array.isArray(out?.wozvalue) ? out.wozvalue : [];
+    if (list.length === 0) {
+      console.log("[ALTUM/WOZ] no wozvalue array; raw=", JSON.stringify(out).slice(0, 300));
+      return null;
+    }
+    const parsed = list
+      .map((row) => {
+        const dateStr = String(row?.Date ?? row?.date ?? "");
+        const yearMatch = dateStr.match(/(\d{4})/);
+        const jaar = yearMatch ? Number(yearMatch[1]) : NaN;
+        const valStr = String(row?.IndexedValue ?? row?.Value ?? row?.value ?? "");
+        const waarde = Number(valStr.replace(/[^\d]/g, ""));
+        return { jaar, waarde };
+      })
+      .filter((e) => Number.isFinite(e.jaar) && Number.isFinite(e.waarde) && e.waarde > 0)
+      .sort((a, b) => a.jaar - b.jaar);
+    if (parsed.length === 0) return null;
+    // Pak laatste 5 jaren
+    return parsed.slice(-5);
+  } catch (e) {
+    console.log("[ALTUM/WOZ] error:", (e as Error).message);
     return null;
   }
 }

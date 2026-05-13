@@ -7,6 +7,7 @@ import {
   cryptoRandomId,
   fallbackAI,
   fetchAltum,
+  fetchAltumWozHistory,
   fetchBagApi,
   fetchBagVbo,
   fetchEnergielabel,
@@ -120,7 +121,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     const huisnummer = extractHuisnummer(pdok?.adres) ?? extractHuisnummer(addressForPdok);
 
     // Fase 2: parallelle data-ophaal
-    const [bagWfs, bagApi, monument, energie, altum] = await Promise.all([
+    const [bagWfs, bagApi, monument, energie, altum, altumWoz] = await Promise.all([
       fetchBagVbo(pdok?.bagId).catch((e: any) => {
         errors.bag_wfs = String(e?.message ?? e);
         return null;
@@ -141,6 +142,10 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         errors.altum = String(e?.message ?? e);
         return null;
       }),
+      fetchAltumWozHistory(pdok?.postcode, huisnummer).catch((e: any) => {
+        errors.altum_woz = String(e?.message ?? e);
+        return null;
+      }),
     ]);
 
     const bag = bagApi ?? bagWfs;
@@ -149,6 +154,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (monument?.rijksmonument) bronnen.push("RCE Monumenten");
     if (energie) bronnen.push("EP Online");
     if (altum) bronnen.push("Altum AI");
+    if (altumWoz?.length) bronnen.push("Altum AI WOZ-historie");
 
     // Fase 3: AI primair (Lovable) + secundair (Anthropic) parallel
     const prompt = buildPrompt({
@@ -228,6 +234,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : ((listing?.bron === "apify" || listing?.bron === "scraperapi") ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : (listing?.bron === "apify" || listing?.bron === "scraperapi") ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
       { naam: "Altum AI waarde-indicatie", data: altum?.marktwaarde ? `€${altum.marktwaarde}` : "—", status: altum ? "ok" : "estimate" },
+      { naam: "Altum AI WOZ-historie", data: altumWoz?.length ? `${altumWoz.length} jaren` : "—", status: altumWoz?.length ? "ok" : "estimate" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
     ];
 
@@ -245,9 +252,11 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       altum: altum ?? null,
       errors,
       bronnen,
-      woz: altum?.woz_geschat
-        ? synthesizeWoz(altum.woz_geschat * 1.1)
-        : synthesizeWoz(primary.marktwaarde_ai),
+      woz: altumWoz?.length
+        ? altumWoz
+        : altum?.woz_geschat
+          ? synthesizeWoz(altum.woz_geschat * 1.1)
+          : synthesizeWoz(primary.marktwaarde_ai),
       energielabel,
       is_apartment: isApt,
       perceel_m2: data.pandtype === "commercieel" || isApt ? undefined : (listing?.perceel_m2 ?? 120),
