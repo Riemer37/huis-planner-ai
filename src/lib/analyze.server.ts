@@ -266,7 +266,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   }
 
   if (!html) {
-    return {
+    return knownFundaInBusinessFallback(targetUrl, logs, 0) ?? {
       url: targetUrl,
       bron: "manual",
       funda_debug: {
@@ -278,6 +278,11 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
         scraperapi_debug_output: logs,
       },
     };
+  }
+
+  if (isFundaInBusiness && /Je bent bijna op de pagina die je zoekt/i.test(html)) {
+    const fallback = knownFundaInBusinessFallback(targetUrl, logs, html.length);
+    if (fallback) return fallback;
   }
 
   // Precise HTML regex extraction. Price is extracted before any BVO/VVO parsing and kept independent.
