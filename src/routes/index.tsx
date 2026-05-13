@@ -11,14 +11,10 @@ import { PotentialTab } from "@/components/tabs/PotentialTab";
 import { PurchaseTab } from "@/components/tabs/PurchaseTab";
 import { RenovationTab } from "@/components/tabs/RenovationTab";
 import { ExitTab } from "@/components/tabs/ExitTab";
-import { ManualOverridePanel } from "@/components/ManualOverridePanel";
-import { PrefillForm } from "@/components/PrefillForm";
 
 import { analyzeProperty } from "@/lib/analyze.functions";
-import { prefetchProperty } from "@/lib/prefetch.functions";
-import { applyManualOverrides } from "@/lib/overrides";
 import { findCached, saveAnalysis } from "@/lib/storage";
-import type { ManualOverrides, PandType, PrefillResult, PropertyAnalysis } from "@/lib/types";
+import type { PandType, PropertyAnalysis } from "@/lib/types";
 import heroImage from "@/assets/hero-architecture.jpg";
 import { Search, Loader2 } from "lucide-react";
 
@@ -45,26 +41,15 @@ type TabId = (typeof TABS)[number]["id"];
 
 function VastgoedAI() {
   const analyze = useServerFn(analyzeProperty);
-  const prefetch = useServerFn(prefetchProperty);
   const [analysis, setAnalysis] = useState<PropertyAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [stages, setStages] = useState<string[]>([]);
   const [tab, setTab] = useState<TabId>("overzicht");
   const [error, setError] = useState<string | null>(null);
-  const [prefill, setPrefill] = useState<PrefillResult | null>(null);
-  const [pendingPandtype, setPendingPandtype] = useState<PandType>("woning");
 
-  const handleManualSave = (overrides: ManualOverrides) => {
-    if (!analysis) return;
-    const updated = applyManualOverrides(analysis, overrides);
-    saveAnalysis(updated);
-    setAnalysis(updated);
-  };
-
-  const handleAnalyze = async (q: string, pandtype: PandType) => {
+  const handleAnalyze = async (q: string, pandtype: PandType = "woning") => {
     setError(null);
     setAnalysis(null);
-    setPrefill(null);
     const isUrl = /^https?:\/\//i.test(q);
     if (!isUrl) {
       const cached = findCached(q);
@@ -74,35 +59,25 @@ function VastgoedAI() {
       }
     }
     setLoading(true);
-    setPendingPandtype(pandtype);
-    setStages(["PDOK locatie ophalen…", "BAG verblijfsobject…", "EP-online energielabel…", "Funda (best-effort)…"]);
-    try {
-      const pre = (await prefetch({ data: { query: q, isUrl } })) as PrefillResult;
-      setPrefill(pre);
-    } catch (e: any) {
-      setError(e?.message ?? "Pre-fetch mislukt");
-    } finally {
-      setLoading(false);
-      setStages([]);
-    }
-  };
-
-  const handleStartAnalysis = async (manualInput: ManualOverrides) => {
-    if (!prefill) return;
-    setLoading(true);
-    setStages(["AI-analyse loopt…"]);
+    setStages([
+      "Funda ophalen via Apify…",
+      "PDOK locatie…",
+      "BAG verblijfsobject…",
+      "EP-online energielabel…",
+      "AI-analyse…",
+    ]);
     try {
       const result = (await analyze({
-        data: {
-          query: prefill.query,
-          pandtype: pendingPandtype,
-          isUrl: prefill.isUrl,
-          manualInput,
-        },
+        data: { query: q, pandtype, isUrl },
       })) as PropertyAnalysis;
+      if (isUrl && result.listing?.funda_debug?.blocked) {
+        setError(
+          "Apify kon de Funda-pagina niet ophalen. Controleer de URL en probeer het opnieuw.",
+        );
+        return;
+      }
       saveAnalysis(result);
       setAnalysis(result);
-      setPrefill(null);
       setTab("overzicht");
     } catch (e: any) {
       setError(e?.message ?? "Analyse mislukt");
@@ -117,15 +92,7 @@ function VastgoedAI() {
       <Sidebar onAnalyze={handleAnalyze} onSelectHistory={(a) => { setAnalysis(a); setTab("overzicht"); }} loading={loading} loadingStages={stages} current={analysis} />
 
       <main className="flex-1 min-w-0 flex flex-col">
-        {prefill ? (
-          <PrefillForm
-            prefill={prefill}
-            pandtype={pendingPandtype}
-            loading={loading}
-            onCancel={() => { setPrefill(null); setError(null); }}
-            onSubmit={handleStartAnalysis}
-          />
-        ) : !analysis ? (
+        {!analysis ? (
           <EmptyState error={error} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
         ) : (
           <>
@@ -156,9 +123,6 @@ function VastgoedAI() {
               {tab === "aankoop" && <PurchaseTab a={analysis} />}
               {tab === "renovatie" && <RenovationTab a={analysis} />}
               {tab === "exit" && <ExitTab a={analysis} />}
-              <div className="mt-6 space-y-4">
-                <ManualOverridePanel a={analysis} onSave={handleManualSave} />
-              </div>
             </div>
           </>
         )}
@@ -172,7 +136,6 @@ function EmptyState({ error, loading, onAnalyze }: { error: string | null; loadi
   const submit = () => { if (q.trim() && !loading) onAnalyze(q.trim()); };
   return (
     <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-      {/* Hero background */}
       <img
         src={heroImage}
         alt="Klassieke Amsterdamse grachtenpanden tijdens het gouden uur"
@@ -180,18 +143,16 @@ function EmptyState({ error, loading, onAnalyze }: { error: string | null; loadi
         height={1080}
         className="absolute inset-0 w-full h-full object-cover"
       />
-      {/* Light overlay */}
       <div className="absolute inset-0 bg-white/40" />
       <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-white/60" />
 
-      {/* Centered card */}
       <div className="relative w-full max-w-2xl mx-6 panel shadow-elevated p-8 md:p-10">
         <div className="label-eyebrow mb-3 text-center">Nederlandse Vastgoed Investment Terminal</div>
         <h1 className="display text-3xl md:text-4xl font-extrabold tracking-tight text-navy text-center leading-tight">
           Analyseer elk vastgoedobject in seconden
         </h1>
         <p className="text-sm md:text-[15px] text-muted-foreground mt-3 text-center max-w-lg mx-auto leading-relaxed">
-          Plak een Funda- of Pararius-URL of voer een Nederlands adres in en krijg direct marktwaarde,
+          Plak een Funda-URL of voer een Nederlands adres in en krijg direct marktwaarde,
           maximaal bod, risicoprofiel en rendement.
         </p>
 
@@ -222,9 +183,9 @@ function EmptyState({ error, loading, onAnalyze }: { error: string | null; loadi
 
         <div className="mt-8 grid grid-cols-3 gap-3 text-[11px]">
           {[
+            { k: "Apify · Funda", v: "Automatische scraping" },
             { k: "PDOK · BAG · RCE", v: "Officiële databronnen" },
             { k: "Lovable AI Gateway", v: "Real-time analyse" },
-            { k: "Lokale cache 24u", v: "30 analyses" },
           ].map((c) => (
             <div key={c.k} className="rounded-md border border-border bg-background/80 backdrop-blur p-3 text-left">
               <div className="label-eyebrow">{c.k}</div>
