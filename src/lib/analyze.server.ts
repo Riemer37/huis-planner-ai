@@ -535,11 +535,11 @@ function parseListingHtml(html: string, url: string): Listing {
   const rxPlotVal = perceelIdx === -1 ? null : (html.substring(perceelIdx, perceelIdx + 200).match(/(\d{1,6})\s*m²/i)?.[1] ?? null);
 
   const energyIdx = html.indexOf(">Energielabel<");
-  const rxEnergy = energyIdx === -1 ? null : html.substring(energyIdx, energyIdx + 200).match(/([A-G][+]{0,3})\s*</);
+  const rxEnergy = energyIdx === -1 ? null : html.substring(energyIdx, energyIdx + 500).match(/([A-G][+]{0,3})\s*</);
   const kamersIdx = html.indexOf(">Aantal kamers<");
-  const rxRooms = kamersIdx === -1 ? null : (html.substring(kamersIdx, kamersIdx + 100).match(/(\d+)\s*kamer/) ?? html.substring(kamersIdx, kamersIdx + 100).match(/>(\d+)</));
+  const rxRooms = kamersIdx === -1 ? null : (html.substring(kamersIdx, kamersIdx + 200).match(/(\d+)\s*kamer/) ?? html.substring(kamersIdx, kamersIdx + 200).match(/>(\d+)</));
   const bouwjaarIdx = html.indexOf(">Bouwjaar<");
-  const rxYear = bouwjaarIdx === -1 ? null : html.substring(bouwjaarIdx, bouwjaarIdx + 100).match(/(1[6-9]\d{2}|20[0-2]\d)/);
+  const rxYear = bouwjaarIdx === -1 ? null : html.substring(bouwjaarIdx, bouwjaarIdx + 200).match(/(1[6-9]\d{2}|20[0-2]\d)/);
 
   regexResults["html.price_kk"] = rxPrice?.[1] ?? null;
   regexResults["html.living_area_m2"] = rxAreaVal;
