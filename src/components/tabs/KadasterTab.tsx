@@ -17,7 +17,7 @@ function ConfDot({ level, title }: { level: Conf; title: string }) {
   return <span title={title} className={`inline-block size-2 rounded-full ${cls} mr-1.5 align-middle`} />;
 }
 
-export function KadasterTab({ a }: { a: PropertyAnalysis }) {
+export function KadasterTab({ a, onUpdate }: { a: PropertyAnalysis; onUpdate?: (next: PropertyAnalysis) => void }) {
   const woz = a.woz ?? [];
   const max = Math.max(...woz.map((w) => w.waarde), 1);
   const huidigLabel = (a.energielabel?.label ?? "—").toUpperCase();
