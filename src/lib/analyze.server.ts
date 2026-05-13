@@ -288,6 +288,23 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     }
   }
 
+  // Funda in Business — fallback: BVO/VVO genoemd in beschrijvingstekst (NL-getal: "1.228,20")
+  if (isFundaInBusiness && woonoppervlakte === null) {
+    const bvoMatch =
+      html.match(/([\d.]+(?:,\d+)?)\s*m²\s*BVO/i) ??
+      html.match(/([\d.]+(?:,\d+)?)\s*m²\s*VVO/i) ??
+      html.match(/vloeroppervlak[^\d]*([\d.]+(?:,\d+)?)\s*m²/i) ??
+      html.match(/totaal[^\d]*([\d.]+(?:,\d+)?)\s*m²/i);
+    if (bvoMatch) {
+      const cleaned = bvoMatch[1].replace(/\./g, "").replace(",", ".");
+      const n = parseFloat(cleaned);
+      if (Number.isFinite(n) && n > 0 && n < 1_000_000) {
+        woonoppervlakte = Math.round(n);
+        m2FibAnchor = "description-BVO/VVO";
+      }
+    }
+  }
+
   // Energielabel — NIET scrapen voor Funda in Business (commercieel; vaak niet vereist en velden zijn onbetrouwbaar)
   let energielabel: string | null = null;
   if (!isFundaInBusiness) {
