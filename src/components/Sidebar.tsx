@@ -17,6 +17,8 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
   const [pandtype, setPandtype] = useState<PandType>("woning");
   const [pandtypeAuto, setPandtypeAuto] = useState(false);
   const [history, setHistory] = useState<PropertyAnalysis[]>([]);
+  const isFundaInBusinessQuery = /fundainbusiness\.nl/i.test(q);
+  const selectedPandtype: PandType = isFundaInBusinessQuery ? "commercieel" : pandtype;
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -37,9 +39,17 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
     }
   }, [q, pandtype, pandtypeAuto]);
 
+  const handleQueryChange = (value: string) => {
+    setQ(value);
+    if (/fundainbusiness\.nl/i.test(value)) {
+      setPandtype("commercieel");
+      setPandtypeAuto(true);
+    }
+  };
+
   const submit = () => {
     if (!q.trim() || loading) return;
-    onAnalyze(q.trim(), pandtype);
+    onAnalyze(q.trim(), selectedPandtype);
   };
 
   return (
@@ -64,7 +74,7 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
           <Search className="size-4 absolute left-3 top-3 text-muted-foreground pointer-events-none" />
           <textarea
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -80,7 +90,7 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
         <div>
           <label className="label-eyebrow block mb-1.5">Pandtype</label>
           <select
-            value={pandtype}
+            value={selectedPandtype}
             onChange={(e) => setPandtype(e.target.value as PandType)}
             className="w-full bg-muted rounded-md px-2.5 py-2 text-sm border border-border"
           >
