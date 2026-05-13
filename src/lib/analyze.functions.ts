@@ -161,6 +161,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       altum,
       energie,
       isUrl,
+      isFundaInBusiness,
     });
 
     const [primary, secondary] = await Promise.all([
