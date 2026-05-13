@@ -13,7 +13,7 @@ import { RenovationTab } from "@/components/tabs/RenovationTab";
 import { ExitTab } from "@/components/tabs/ExitTab";
 
 import { analyzeProperty } from "@/lib/analyze.functions";
-import { findCached, saveAnalysis } from "@/lib/storage";
+import { clearCachedInput, findCached, saveAnalysis } from "@/lib/storage";
 import type { PandType, PropertyAnalysis } from "@/lib/types";
 import heroImage from "@/assets/hero-architecture.jpg";
 import { Search, Loader2 } from "lucide-react";
@@ -56,6 +56,7 @@ function VastgoedAI() {
     const isFundaInBusiness = isUrl && /fundainbusiness\.nl/i.test(q);
     // Funda in Business = altijd commercieel pand
     const effectivePandtype: PandType = isFundaInBusiness ? "commercieel" : pandtype;
+    if (isFundaInBusiness) clearCachedInput(q);
     if (!isUrl) {
       const cached = findCached(q);
       if (cached && cached.pandtype === effectivePandtype) {
