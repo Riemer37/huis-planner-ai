@@ -52,6 +52,15 @@ export function PropertyHeader({ a }: { a: PropertyAnalysis }) {
   // vraagprijs: Funda scraping only — no other source has this
   const fundaM2 = a.listing?.m2 && !a.listing.funda_debug?.blocked ? a.listing.m2 : undefined;
   const m2 = fundaM2 ?? a.bag?.oppervlakte ?? a.altum?.oppervlakte;
+  // eslint-disable-next-line no-console
+  console.log("[PropertyHeader] oppervlakte sources →", {
+    url: a.listing?.url,
+    "listing.m2": a.listing?.m2,
+    "listing.funda_debug.blocked": a.listing?.funda_debug?.blocked,
+    "bag.oppervlakte": a.bag?.oppervlakte,
+    "altum.oppervlakte": a.altum?.oppervlakte,
+    resolved: m2,
+  });
   const bouwjaar = a.bag?.bouwjaar ?? a.listing?.bouwjaar;
   const label = a.energielabel?.label ?? a.listing?.energielabel ?? "—";
   const bagUrl = a.pdok?.bagId ? `https://bagviewer.kadaster.nl/lvbag/bag-viewer/?objectId=${a.pdok.bagId}` : null;
