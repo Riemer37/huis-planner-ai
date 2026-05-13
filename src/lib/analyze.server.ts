@@ -239,7 +239,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     const chunk = html.substring(wonenIdx, wonenIdx + 300);
     m2Fallback = chunk.match(/(\d{1,4})\s*m²/i);
   }
-  const woonoppervlakte = m2Primary ? parseInt(m2Primary[1]) : m2Fallback ? parseInt(m2Fallback[1]) : null;
+  let woonoppervlakte = m2Primary ? parseInt(m2Primary[1]) : m2Fallback ? parseInt(m2Fallback[1]) : null;
 
   const energyIdx = html.indexOf(">Energielabel<");
   let energielabel: string | null = null;
@@ -376,7 +376,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
       next_data_found: nextDataFound,
       blocked,
       raw_next_data: (nd ?? null) as JsonValue,
-      raw_energy_label: labelMatch?.[1],
+      raw_energy_label: energielabel ?? undefined,
       final_energy_label: energielabel ?? undefined,
       html_regex_results: regexResults,
       logs,
