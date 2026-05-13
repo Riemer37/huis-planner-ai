@@ -46,9 +46,11 @@ function VastgoedAI() {
   const [stages, setStages] = useState<string[]>([]);
   const [tab, setTab] = useState<TabId>("overzicht");
   const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<{ logs: string[]; raw: unknown } | null>(null);
 
   const handleAnalyze = async (q: string, pandtype: PandType = "woning") => {
     setError(null);
+    setDebug(null);
     setAnalysis(null);
     const isUrl = /^https?:\/\//i.test(q);
     if (!isUrl) {
@@ -72,8 +74,12 @@ function VastgoedAI() {
       })) as PropertyAnalysis;
       if (isUrl && result.listing?.funda_debug?.blocked) {
         setError(
-          "Apify kon de Funda-pagina niet ophalen. Controleer de URL en probeer het opnieuw.",
+          "Apify kon de Funda-pagina niet ophalen. Zie debug-output hieronder.",
         );
+        setDebug({
+          logs: result.listing?.funda_debug?.logs ?? [],
+          raw: result.listing?.funda_debug?.raw_next_data ?? null,
+        });
         return;
       }
       saveAnalysis(result);
@@ -93,7 +99,7 @@ function VastgoedAI() {
 
       <main className="flex-1 min-w-0 flex flex-col">
         {!analysis ? (
-          <EmptyState error={error} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
+          <EmptyState error={error} debug={debug} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
         ) : (
           <>
             <PropertyHeader a={analysis} />
@@ -131,7 +137,7 @@ function VastgoedAI() {
   );
 }
 
-function EmptyState({ error, loading, onAnalyze }: { error: string | null; loading: boolean; onAnalyze: (q: string) => void }) {
+function EmptyState({ error, debug, loading, onAnalyze }: { error: string | null; debug: { logs: string[]; raw: unknown } | null; loading: boolean; onAnalyze: (q: string) => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (q.trim() && !loading) onAnalyze(q.trim()); };
   return (
@@ -179,6 +185,17 @@ function EmptyState({ error, loading, onAnalyze }: { error: string | null; loadi
 
         {error && (
           <p className="mt-4 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-3 text-center">{error}</p>
+        )}
+        {debug && (
+          <div className="mt-4 text-xs bg-muted border border-border rounded-md p-3 max-h-96 overflow-auto text-left font-mono">
+            <div className="font-bold mb-2">Apify debug</div>
+            {debug.logs.map((l, i) => (
+              <div key={i} className="whitespace-pre-wrap break-all">{l}</div>
+            ))}
+            {debug.raw != null && (
+              <pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(debug.raw, null, 2)}</pre>
+            )}
+          </div>
         )}
 
         <div className="mt-8 grid grid-cols-3 gap-3 text-[11px]">
