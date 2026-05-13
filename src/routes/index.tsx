@@ -73,7 +73,7 @@ function VastgoedAI() {
     ]);
     try {
       const result = (await analyze({
-        data: { query: q, pandtype, isUrl },
+        data: { query: q, pandtype: effectivePandtype, isUrl },
       })) as PropertyAnalysis;
       if (isUrl && result.listing?.funda_debug?.blocked) {
         setError(
