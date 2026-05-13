@@ -73,8 +73,18 @@ function VastgoedAI() {
       "AI-analyse…",
     ]);
     try {
+      // 30-daagse cache van marktwaarde per adres → bespaart Altum-credits
+      const mwKey = `vg-mw:${q.toLowerCase().trim()}`;
+      let cachedMarktwaarde: number | undefined;
+      try {
+        const raw = localStorage.getItem(mwKey);
+        if (raw) {
+          const { v, ts } = JSON.parse(raw);
+          if (Date.now() - ts < 30 * 24 * 60 * 60 * 1000 && typeof v === "number" && v > 0) cachedMarktwaarde = v;
+        }
+      } catch { /* ignore */ }
       const result = (await analyze({
-        data: { query: q, pandtype: effectivePandtype, isUrl },
+        data: { query: q, pandtype: effectivePandtype, isUrl, cachedMarktwaarde },
       })) as PropertyAnalysis;
       if (isUrl && result.listing?.funda_debug?.blocked) {
         setError(
@@ -85,6 +95,10 @@ function VastgoedAI() {
           raw: result.listing?.funda_debug?.raw_next_data ?? null,
         });
         return;
+      }
+      // Persist marktwaarde voor 30 dagen wanneer we een echte AVM-waarde van Altum kregen
+      if (result.altum?.marktwaarde && result.altum?.marktwaarde_source === "altum_avm") {
+        try { localStorage.setItem(mwKey, JSON.stringify({ v: result.altum.marktwaarde, ts: Date.now() })); } catch { /* ignore */ }
       }
       saveAnalysis(result);
       setAnalysis(result);
