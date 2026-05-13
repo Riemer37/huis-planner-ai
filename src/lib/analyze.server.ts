@@ -193,6 +193,7 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     console.log("[ScraperAPI] SCRAPER_API_KEY not set");
     return null;
   }
+  const isFundaInBusiness = /fundainbusiness\.nl/i.test(targetUrl);
   const logs: string[] = [];
 
   // Attempt 1: render=false
@@ -248,12 +249,33 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
   else if (m2Primary) woonoppervlakte = parseInt(m2Primary[1]);
   else if (m2Desc) woonoppervlakte = Math.round(parseFloat(m2Desc[1].replace(",", ".")));
 
-  const energyIdx = html.indexOf(">Energielabel<");
+  // Funda in Business gebruikt andere kenmerk-labels
+  let m2FibAnchor: string | null = null;
+  if (isFundaInBusiness && woonoppervlakte === null) {
+    const fibAnchors = [">Oppervlakte<", ">Vloeroppervlak<", ">Totaal oppervlak<", ">BVO<", ">VVO<", ">Hoofdfunctie<"];
+    for (const anchor of fibAnchors) {
+      const idx = html.indexOf(anchor);
+      if (idx !== -1) {
+        const chunk = html.substring(idx, idx + 300);
+        const match = chunk.match(/(\d{1,6})(?:[.,]\d+)?\s*m²/i);
+        if (match) {
+          woonoppervlakte = Math.round(parseFloat(match[1].replace(",", ".")));
+          m2FibAnchor = anchor;
+          break;
+        }
+      }
+    }
+  }
+
+  // Energielabel — NIET scrapen voor Funda in Business (commercieel; vaak niet vereist en velden zijn onbetrouwbaar)
   let energielabel: string | null = null;
-  if (energyIdx !== -1) {
-    const chunk = html.substring(energyIdx, energyIdx + 500);
-    const match = chunk.match(/([A-G][+]{0,3})\s*</);
-    energielabel = match?.[1] ?? null;
+  if (!isFundaInBusiness) {
+    const energyIdx = html.indexOf(">Energielabel<");
+    if (energyIdx !== -1) {
+      const chunk = html.substring(energyIdx, energyIdx + 500);
+      const match = chunk.match(/([A-G][+]{0,3})\s*</);
+      energielabel = match?.[1] ?? null;
+    }
   }
 
   const bouwjaarIdx = html.indexOf(">Bouwjaar<");
@@ -290,6 +312,8 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     constructionYear: bouwjaar,
     numberOfRooms: aantalKamers,
     plotArea: perceeloppervlakte,
+    fibAnchor: m2FibAnchor,
+    isFundaInBusiness: isFundaInBusiness ? 1 : 0,
   };
   logs.push(`[Regex raw] ${JSON.stringify(regexResults)}`);
   logs.push(`[HTML first 2000] ${html.substring(0, 2000)}`);

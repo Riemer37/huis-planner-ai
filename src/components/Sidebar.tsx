@@ -15,11 +15,25 @@ interface Props {
 export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, current }: Props) {
   const [q, setQ] = useState("");
   const [pandtype, setPandtype] = useState<PandType>("woning");
+  const [pandtypeAuto, setPandtypeAuto] = useState(false);
   const [history, setHistory] = useState<PropertyAnalysis[]>([]);
 
   useEffect(() => {
     setHistory(loadHistory());
   }, [current?.id]);
+
+  // Auto-detect Funda in Business → commercieel
+  useEffect(() => {
+    if (/fundainbusiness\.nl/i.test(q)) {
+      if (pandtype !== "commercieel") {
+        setPandtype("commercieel");
+        setPandtypeAuto(true);
+      }
+    } else if (pandtypeAuto) {
+      setPandtype("woning");
+      setPandtypeAuto(false);
+    }
+  }, [q, pandtype, pandtypeAuto]);
 
   const submit = () => {
     if (!q.trim() || loading) return;
