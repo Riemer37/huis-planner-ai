@@ -82,6 +82,7 @@ export interface PrefillResult {
 
 export interface PdokResult {
   bagId?: string;
+  nummeraanduidingId?: string;
   adres: string;
   postcode?: string;
   woonplaats?: string;
