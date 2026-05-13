@@ -239,14 +239,14 @@ export async function scrapeListing(targetUrl: string): Promise<Listing | null> 
     const chunk = html.substring(wonenIdx, wonenIdx + 300);
     m2Kenmerken = chunk.match(/(\d{1,4})(?:[.,]\d)?\s*m²/i);
   }
-  // SECONDARY: description text (e.g. "72,7 m² woonoppervlakte" → 73)
-  const m2Desc = html.match(/(\d{1,4})(?:[.,]\d)?\s*m²\s*woonoppervlakte/i);
-  // FALLBACK: header pill (rounded)
+  // SECONDARY: header pill (rounded but agrees with kenmerken)
   const m2Primary = html.match(/(\d{1,4})\s*m²\s*<\/span>\s*<span[^>]*>\s*wonen/i);
+  // FALLBACK: description text (e.g. "72,7 m² woonoppervlakte" → 73)
+  const m2Desc = html.match(/(\d{1,4})(?:[.,]\d)?\s*m²\s*woonoppervlakte/i);
   let woonoppervlakte: number | null = null;
   if (m2Kenmerken) woonoppervlakte = Math.round(parseFloat(m2Kenmerken[1].replace(",", ".")));
-  else if (m2Desc) woonoppervlakte = Math.round(parseFloat(m2Desc[1].replace(",", ".")));
   else if (m2Primary) woonoppervlakte = parseInt(m2Primary[1]);
+  else if (m2Desc) woonoppervlakte = Math.round(parseFloat(m2Desc[1].replace(",", ".")));
 
   const energyIdx = html.indexOf(">Energielabel<");
   let energielabel: string | null = null;
