@@ -266,6 +266,8 @@ export function KadasterTab({ a, onUpdate }: { a: PropertyAnalysis; onUpdate?: (
         </div>
       </div>
 
+      <ComparablesSection a={a} />
+
       {/* Databronnen */}
       <div className="bg-card border rounded-lg p-5">
         <div className="flex items-center gap-2 mb-3">
