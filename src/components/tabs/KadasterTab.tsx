@@ -1,7 +1,122 @@
 import { CheckCircle2, Circle, XCircle, Info } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import type { DataSource, PropertyAnalysis } from "@/lib/types";
 import { fmtEUR, fmtNum, isApartment } from "@/lib/calculations";
 import { SourceBadge } from "@/components/SourceBadge";
+import { getComparables, type CompsResult, type Comparable } from "@/lib/comps.functions";
+
+function extractHuisnummer(adres?: string): string | undefined {
+  if (!adres) return undefined;
+  const m = adres.match(/\b(\d+)([a-zA-Z]?)\b/);
+  return m ? m[1] : undefined;
+}
+
+function staatBadge(s: Comparable["staat"]) {
+  const map = {
+    instapklaar: { label: "Instapklaar", cls: "bg-positive/15 text-positive border-positive/30" },
+    redelijk: { label: "Redelijk", cls: "bg-warning/15 text-warning border-warning/40" },
+    renovatie: { label: "Renovatie nodig", cls: "bg-destructive/15 text-destructive border-destructive/30" },
+    onbekend: { label: "Onbekend", cls: "bg-muted text-muted-foreground border-border" },
+  } as const;
+  const v = map[s];
+  return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${v.cls}`}>{v.label}</span>;
+}
+
+function ComparablesSection({ a }: { a: PropertyAnalysis }) {
+  const fetchComps = useServerFn(getComparables);
+  const [state, setState] = useState<{ loading: boolean; result?: CompsResult }>({ loading: true });
+  const postcode = a.pdok?.postcode;
+  const huisnummer = extractHuisnummer(a.pdok?.adres) ?? extractHuisnummer(a.input);
+  const subjectM2 = a.listing?.m2 ?? a.bag?.oppervlakte;
+  const subjectPrijs = a.listing?.prijs ?? a.listing?.vraagprijs;
+  const subjectPpm = subjectPrijs && subjectM2 ? Math.round(subjectPrijs / subjectM2) : undefined;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!postcode || !huisnummer) {
+      setState({ loading: false, result: { status: "error", message: "Postcode/huisnummer onbekend" } });
+      return;
+    }
+    setState({ loading: true });
+    fetchComps({ data: { postcode, huisnummer, m2: subjectM2 } })
+      .then((res) => { if (!cancelled) setState({ loading: false, result: res }); })
+      .catch((e) => { if (!cancelled) setState({ loading: false, result: { status: "error", message: String(e?.message ?? e) } }); });
+    return () => { cancelled = true; };
+  }, [postcode, huisnummer, subjectM2, fetchComps]);
+
+  return (
+    <div className="bg-card border rounded-lg p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vergelijkbare verkopen (1km radius)</div>
+        <span className="text-[10px] text-muted-foreground">Bron: Altum AI Woningreferentie</span>
+      </div>
+      {state.loading && <p className="text-sm text-muted-foreground">Vergelijkbare verkopen ophalen…</p>}
+      {!state.loading && state.result?.status === "rate_limited" && (
+        <p className="text-sm text-warning">Limiet bereikt — upgrade Altum AI plan voor vergelijkbare verkopen.</p>
+      )}
+      {!state.loading && state.result?.status === "error" && (
+        <p className="text-sm text-destructive">Niet beschikbaar: {state.result.message}</p>
+      )}
+      {!state.loading && state.result?.status === "empty" && (
+        <p className="text-sm text-muted-foreground">Geen vergelijkbare verkopen gevonden in 1km radius.</p>
+      )}
+      {!state.loading && state.result?.status === "ok" && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b text-muted-foreground uppercase tracking-wide text-[10px]">
+                <th className="text-left py-2 pr-2">Adres</th>
+                <th className="text-left py-2 pr-2">Type</th>
+                <th className="text-right py-2 pr-2">m²</th>
+                <th className="text-right py-2 pr-2">Bouwjaar</th>
+                <th className="text-right py-2 pr-2">Verkoopprijs</th>
+                <th className="text-right py-2 pr-2">€/m²</th>
+                <th className="text-left py-2 pr-2">Verkoopdatum</th>
+                <th className="text-left py-2">Staat</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b bg-primary/10 font-semibold">
+                <td className="py-2 pr-2">{a.pdok?.adres ?? a.input} <span className="text-[10px] uppercase text-primary ml-1">subject</span></td>
+                <td className="py-2 pr-2">{isApartment(a) ? "Appartement" : "Woning"}</td>
+                <td className="py-2 pr-2 text-right tabular">{subjectM2 ? fmtNum(subjectM2) : "—"}</td>
+                <td className="py-2 pr-2 text-right tabular">{a.bag?.bouwjaar ?? a.listing?.bouwjaar ?? "—"}</td>
+                <td className="py-2 pr-2 text-right tabular">{subjectPrijs ? fmtEUR(subjectPrijs) : "—"}</td>
+                <td className="py-2 pr-2 text-right tabular">{subjectPpm ? fmtEUR(subjectPpm) : "—"}</td>
+                <td className="py-2 pr-2">—</td>
+                <td className="py-2">—</td>
+              </tr>
+              {state.result.comps.map((c, i) => {
+                const diff = c.prijs_per_m2 && subjectPpm ? c.prijs_per_m2 - subjectPpm : undefined;
+                const diffCls = diff === undefined ? "" : diff > 0 ? "text-destructive" : "text-positive";
+                return (
+                  <tr key={i} className="border-b last:border-b-0 hover:bg-muted/40">
+                    <td className="py-2 pr-2">{c.adres}</td>
+                    <td className="py-2 pr-2">{c.type}</td>
+                    <td className="py-2 pr-2 text-right tabular">{c.m2 ? fmtNum(c.m2) : "—"}</td>
+                    <td className="py-2 pr-2 text-right tabular">{c.bouwjaar ?? "—"}</td>
+                    <td className="py-2 pr-2 text-right tabular">{c.prijs ? fmtEUR(c.prijs) : "—"}</td>
+                    <td className="py-2 pr-2 text-right tabular">
+                      {c.prijs_per_m2 ? fmtEUR(c.prijs_per_m2) : "—"}
+                      {diff !== undefined && (
+                        <span className={`ml-1 text-[10px] ${diffCls}`}>
+                          {diff > 0 ? "+" : ""}{fmtEUR(diff)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-2 tabular">{c.datum ?? "—"}</td>
+                    <td className="py-2">{staatBadge(c.staat)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const labels = ["A+++", "A++", "A+", "A", "B", "C", "D", "E", "F", "G"];
 
@@ -150,6 +265,8 @@ export function KadasterTab({ a, onUpdate }: { a: PropertyAnalysis; onUpdate?: (
           </div>
         </div>
       </div>
+
+      <ComparablesSection a={a} />
 
       {/* Databronnen */}
       <div className="bg-card border rounded-lg p-5">
