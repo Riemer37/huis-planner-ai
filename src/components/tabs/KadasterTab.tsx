@@ -114,7 +114,12 @@ function ComparablesSection({ a }: { a: PropertyAnalysis }) {
     <div className="bg-card border rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vergelijkbare verkopen (1km radius)</div>
-        <span className="text-[10px] text-muted-foreground">Bron: Altum AI Woningreferentie</span>
+        <div className="flex items-center gap-2">
+          {state.cached && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Cache 90d</span>
+          )}
+          <span className="text-[10px] text-muted-foreground">Bron: Altum AI Woningreferentie</span>
+        </div>
       </div>
       {state.loading && <p className="text-sm text-muted-foreground">Vergelijkbare verkopen ophalen…</p>}
       {!state.loading && state.result?.status === "rate_limited" && (
