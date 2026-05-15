@@ -109,7 +109,15 @@ function ComparablesSection({ a }: { a: PropertyAnalysis }) {
       })
       .catch((e) => { if (!cancelled) setState({ loading: false, result: { status: "error", message: String(e?.message ?? e) } }); });
     return () => { cancelled = true; };
-  }, [postcode, huisnummer, subjectM2, isApt, fetchComps]);
+  }, [postcode, huisnummer, subjectM2, isApt, fetchComps, retryNonce]);
+
+  const handleRetry = () => {
+    const cluster = pc4(postcode);
+    if (cluster) {
+      try { localStorage.removeItem(`vg-comps:${cluster}`); } catch {}
+    }
+    setRetryNonce((n) => n + 1);
+  };
 
   return (
     <div className="bg-card border rounded-lg p-5">
