@@ -23,14 +23,37 @@ function staatBadge(s: Comparable["staat"]) {
   return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${v.cls}`}>{v.label}</span>;
 }
 
+const COMPS_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+function pc4(postcode?: string): string | undefined {
+  if (!postcode) return undefined;
+  const m = postcode.replace(/\s+/g, "").match(/^(\d{4})/);
+  return m ? m[1] : undefined;
+}
+
+function readCompsCache(key: string): Comparable[] | undefined {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return undefined;
+    const j = JSON.parse(raw) as { ts: number; comps: Comparable[] };
+    if (Date.now() - j.ts > COMPS_TTL_MS) return undefined;
+    return j.comps;
+  } catch { return undefined; }
+}
+
+function writeCompsCache(key: string, comps: Comparable[]) {
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), comps })); } catch {}
+}
+
 function ComparablesSection({ a }: { a: PropertyAnalysis }) {
   const fetchComps = useServerFn(getComparables);
-  const [state, setState] = useState<{ loading: boolean; result?: CompsResult }>({ loading: true });
+  const [state, setState] = useState<{ loading: boolean; result?: CompsResult; cached?: boolean }>({ loading: true });
   const postcode = a.pdok?.postcode;
   const huisnummer = extractHuisnummer(a.pdok?.adres) ?? extractHuisnummer(a.input);
   const subjectM2 = a.listing?.m2 ?? a.bag?.oppervlakte;
   const subjectPrijs = a.listing?.prijs ?? a.listing?.vraagprijs;
   const subjectPpm = subjectPrijs && subjectM2 ? Math.round(subjectPrijs / subjectM2) : undefined;
+  const isApt = isApartment(a);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,18 +61,65 @@ function ComparablesSection({ a }: { a: PropertyAnalysis }) {
       setState({ loading: false, result: { status: "error", message: "Postcode/huisnummer onbekend" } });
       return;
     }
+    const cluster = pc4(postcode);
+    const cacheKey = cluster ? `vg-comps:${cluster}` : undefined;
+
+    const filterAndSet = (comps: Comparable[], cached: boolean) => {
+      // Client-side filter: ±20% m² + match apartment vs woning, max 8
+      const filtered = comps
+        .filter((c) => {
+          if (subjectM2 && c.m2) {
+            const ratio = c.m2 / subjectM2;
+            if (ratio < 0.7 || ratio > 1.3) return false;
+          }
+          const cIsApt = c.type.toLowerCase().includes("appart");
+          if (isApt !== cIsApt) return false;
+          return true;
+        })
+        .slice(0, 8);
+      if (cancelled) return;
+      setState({
+        loading: false,
+        cached,
+        result: filtered.length ? { status: "ok", comps: filtered } : { status: "empty" },
+      });
+    };
+
+    if (cacheKey) {
+      const hit = readCompsCache(cacheKey);
+      if (hit) {
+        console.log(`[COMPS] cache HIT ${cacheKey} (${hit.length} comps)`);
+        filterAndSet(hit, true);
+        return;
+      }
+      console.log(`[COMPS] cache MISS ${cacheKey} → calling Altum`);
+    }
+
     setState({ loading: true });
     fetchComps({ data: { postcode, huisnummer, m2: subjectM2 } })
-      .then((res) => { if (!cancelled) setState({ loading: false, result: res }); })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.status === "ok" && cacheKey) {
+          writeCompsCache(cacheKey, res.comps);
+          filterAndSet(res.comps, false);
+        } else {
+          setState({ loading: false, result: res, cached: false });
+        }
+      })
       .catch((e) => { if (!cancelled) setState({ loading: false, result: { status: "error", message: String(e?.message ?? e) } }); });
     return () => { cancelled = true; };
-  }, [postcode, huisnummer, subjectM2, fetchComps]);
+  }, [postcode, huisnummer, subjectM2, isApt, fetchComps]);
 
   return (
     <div className="bg-card border rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vergelijkbare verkopen (1km radius)</div>
-        <span className="text-[10px] text-muted-foreground">Bron: Altum AI Woningreferentie</span>
+        <div className="flex items-center gap-2">
+          {state.cached && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Cache 90d</span>
+          )}
+          <span className="text-[10px] text-muted-foreground">Bron: Altum AI Woningreferentie</span>
+        </div>
       </div>
       {state.loading && <p className="text-sm text-muted-foreground">Vergelijkbare verkopen ophalen…</p>}
       {!state.loading && state.result?.status === "rate_limited" && (
