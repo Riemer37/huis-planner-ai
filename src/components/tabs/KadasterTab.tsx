@@ -48,6 +48,7 @@ function writeCompsCache(key: string, comps: Comparable[]) {
 function ComparablesSection({ a }: { a: PropertyAnalysis }) {
   const fetchComps = useServerFn(getComparables);
   const [state, setState] = useState<{ loading: boolean; result?: CompsResult; cached?: boolean }>({ loading: true });
+  const [retryNonce, setRetryNonce] = useState(0);
   const postcode = a.pdok?.postcode;
   const huisnummer = extractHuisnummer(a.pdok?.adres) ?? extractHuisnummer(a.input);
   const subjectM2 = a.listing?.m2 ?? a.bag?.oppervlakte;
@@ -108,7 +109,15 @@ function ComparablesSection({ a }: { a: PropertyAnalysis }) {
       })
       .catch((e) => { if (!cancelled) setState({ loading: false, result: { status: "error", message: String(e?.message ?? e) } }); });
     return () => { cancelled = true; };
-  }, [postcode, huisnummer, subjectM2, isApt, fetchComps]);
+  }, [postcode, huisnummer, subjectM2, isApt, fetchComps, retryNonce]);
+
+  const handleRetry = () => {
+    const cluster = pc4(postcode);
+    if (cluster) {
+      try { localStorage.removeItem(`vg-comps:${cluster}`); } catch {}
+    }
+    setRetryNonce((n) => n + 1);
+  };
 
   return (
     <div className="bg-card border rounded-lg p-5">
@@ -123,7 +132,17 @@ function ComparablesSection({ a }: { a: PropertyAnalysis }) {
       </div>
       {state.loading && <p className="text-sm text-muted-foreground">Vergelijkbare verkopen ophalen…</p>}
       {!state.loading && state.result?.status === "rate_limited" && (
-        <p className="text-sm text-warning">Limiet bereikt — upgrade Altum AI plan voor vergelijkbare verkopen.</p>
+        <div className="flex items-start justify-between gap-3 rounded border border-warning/30 bg-warning/5 p-3">
+          <p className="text-sm text-warning">
+            Vergelijkbare verkopen worden volgende maand automatisch geladen. Altum AI maandlimiet bereikt (gratis plan: 15 calls/maand).
+          </p>
+          <button
+            onClick={handleRetry}
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded border border-warning/40 text-warning hover:bg-warning/10 transition-colors"
+          >
+            🔄 Opnieuw proberen
+          </button>
+        </div>
       )}
       {!state.loading && state.result?.status === "error" && (
         <p className="text-sm text-destructive">Niet beschikbaar: {state.result.message}</p>
