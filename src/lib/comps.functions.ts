@@ -64,16 +64,14 @@ export const getComparables = createServerFn({ method: "POST" })
     const key = process.env.ALTUM_AI_API_KEY;
     if (!key) return { status: "error", message: "ALTUM_AI_API_KEY ontbreekt" };
     const pc = data.postcode.replace(/\s+/g, "").toUpperCase();
-    const m2 = data.m2 ?? 100;
+    // Wide query — one call covers the whole pc4 cluster (cached client-side 90d).
     const body = {
       postcode: pc,
       housenumber: String(data.huisnummer),
       huisnummer: String(data.huisnummer),
       filters: {
         max_distance_km: 1,
-        min_oppervlakte: Math.round(m2 * 0.8),
-        max_oppervlakte: Math.round(m2 * 1.2),
-        max_results: 8,
+        max_results: 50,
       },
     };
     try {
