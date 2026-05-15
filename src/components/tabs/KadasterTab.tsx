@@ -132,7 +132,17 @@ function ComparablesSection({ a }: { a: PropertyAnalysis }) {
       </div>
       {state.loading && <p className="text-sm text-muted-foreground">Vergelijkbare verkopen ophalen…</p>}
       {!state.loading && state.result?.status === "rate_limited" && (
-        <p className="text-sm text-warning">Limiet bereikt — upgrade Altum AI plan voor vergelijkbare verkopen.</p>
+        <div className="flex items-start justify-between gap-3 rounded border border-warning/30 bg-warning/5 p-3">
+          <p className="text-sm text-warning">
+            Vergelijkbare verkopen worden volgende maand automatisch geladen. Altum AI maandlimiet bereikt (gratis plan: 15 calls/maand).
+          </p>
+          <button
+            onClick={handleRetry}
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded border border-warning/40 text-warning hover:bg-warning/10 transition-colors"
+          >
+            🔄 Opnieuw proberen
+          </button>
+        </div>
       )}
       {!state.loading && state.result?.status === "error" && (
         <p className="text-sm text-destructive">Niet beschikbaar: {state.result.message}</p>
