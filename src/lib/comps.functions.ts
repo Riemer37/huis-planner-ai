@@ -96,7 +96,7 @@ export const getComparables = createServerFn({ method: "POST" })
         (Array.isArray(out) && out) ||
         [];
       if (!list.length) return { status: "empty" };
-      const comps: Comparable[] = list.slice(0, 8).map((c: any) => {
+      const comps: Comparable[] = list.slice(0, 50).map((c: any) => {
         const street = pick<string>(c, ["Street", "street", "Straat", "straat"]);
         const hn = pick<string | number>(c, ["HouseNumber", "housenumber", "Huisnummer"]);
         const hnAdd = pick<string>(c, ["HouseNumberAddition", "Huisnummertoevoeging", "addition"]) ?? "";
