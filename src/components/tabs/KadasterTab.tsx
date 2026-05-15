@@ -48,6 +48,7 @@ function writeCompsCache(key: string, comps: Comparable[]) {
 function ComparablesSection({ a }: { a: PropertyAnalysis }) {
   const fetchComps = useServerFn(getComparables);
   const [state, setState] = useState<{ loading: boolean; result?: CompsResult; cached?: boolean }>({ loading: true });
+  const [retryNonce, setRetryNonce] = useState(0);
   const postcode = a.pdok?.postcode;
   const huisnummer = extractHuisnummer(a.pdok?.adres) ?? extractHuisnummer(a.input);
   const subjectM2 = a.listing?.m2 ?? a.bag?.oppervlakte;
