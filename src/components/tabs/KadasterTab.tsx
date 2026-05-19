@@ -170,7 +170,7 @@ export function KadasterTab({ a, onUpdate }: { a: PropertyAnalysis; onUpdate?: (
         </div>
       </div>
 
-      <ComparablesSection a={a} />
+      <ComparablesSection />
 
       {/* Databronnen */}
       <div className="bg-card border rounded-lg p-5">
