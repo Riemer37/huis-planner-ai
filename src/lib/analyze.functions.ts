@@ -6,7 +6,6 @@ import {
   callLovableAI,
   cryptoRandomId,
   fallbackAI,
-  fetchAltum,
   fetchBagApi,
   fetchBagVbo,
   fetchEnergielabel,
