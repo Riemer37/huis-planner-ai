@@ -988,32 +988,98 @@ export function buildPrompt(ctx: any) {
 - Gebruik commerciële waarderingsmethodes: BAR (bruto aanvangsrendement) en NAR (netto aanvangsrendement), GEEN WWS-puntenstelsel.
 - Huurprijs uitdrukken als €/m²/jaar (commercieel_huurprijs_pm2), niet als maandhuur.
 - OVB is altijd 10,4% (geen 2% startersregeling).
-- Energielabel mag ontbreken — niet verplicht voor commercieel.\n`
+- Energielabel mag ontbreken — niet verplicht voor commercieel.
+- Voor marktwaarde: gebruik BAR-methode (markthuur ÷ BAR-rendement) i.p.v. WOZ-ratio.\n`
     : "";
   const askingPrice = ctx.listing?.prijs ?? ctx.listing?.vraagprijs;
   const m2 = ctx.listing?.m2;
   const priceLine = askingPrice
-    ? `\nVRAAGPRIJS (door verkoper): € ${askingPrice.toLocaleString("nl-NL")} k.k. — gebruik dit ALS ANKER voor je marktwaarde_ai. Wijk niet meer dan ±20% af zonder expliciete onderbouwing.${m2 ? ` Oppervlakte: ${m2} m² → vraagprijs/m² = € ${Math.round(askingPrice / m2).toLocaleString("nl-NL")}/m².` : ""}\n`
+    ? `\nVRAAGPRIJS (door verkoper): € ${askingPrice.toLocaleString("nl-NL")} k.k. — gebruik dit als referentie, maar baseer marktwaarde_ai op de WOZ-methodiek hieronder.${m2 ? ` Oppervlakte: ${m2} m² → vraagprijs/m² = € ${Math.round(askingPrice / m2).toLocaleString("nl-NL")}/m².` : ""}\n`
     : "";
+
+  // WOZ-historie + jaarlijkse stijging
+  const woz: { jaar: number; waarde: number }[] = Array.isArray(ctx.woz) ? ctx.woz : [];
+  let wozBlock = "WOZ-historie: niet beschikbaar.";
+  let latestWoz: number | undefined;
+  if (woz.length > 0) {
+    latestWoz = woz[woz.length - 1].waarde;
+    const rows = woz.map((w) => `  ${w.jaar}: € ${w.waarde.toLocaleString("nl-NL")}`).join("\n");
+    let groei = "n.v.t.";
+    if (woz.length >= 2) {
+      const first = woz[0].waarde;
+      const last = woz[woz.length - 1].waarde;
+      const years = woz[woz.length - 1].jaar - woz[0].jaar;
+      if (first > 0 && years > 0) {
+        const cagr = (Math.pow(last / first, 1 / years) - 1) * 100;
+        groei = `${cagr.toFixed(1)}% per jaar (CAGR over ${years} jaar)`;
+      }
+    }
+    wozBlock = `WOZ-historie (Kadaster WOZ Waardeloket):\n${rows}\nGemiddelde stijging: ${groei}\nMeest recente WOZ: € ${latestWoz.toLocaleString("nl-NL")}`;
+  }
+
+  const gemeente = ctx.pdok?.gemeente ?? "onbekend";
+  const buurt = ctx.pdok?.buurt ?? "onbekend";
+  const erfpacht = ctx.listing?.erfpacht === true ? "ja" : ctx.listing?.erfpacht === false ? "nee" : "onbekend";
+  const monument = ctx.monument?.rijksmonument ? "ja (rijksmonument)" : "nee";
+  const bouwjaar = ctx.bag?.bouwjaar ?? ctx.listing?.bouwjaar ?? "onbekend";
+  const opp = ctx.bag?.oppervlakte ?? ctx.listing?.m2 ?? "onbekend";
+  const elabel = ctx.energie?.label ?? ctx.listing?.energielabel ?? "onbekend";
+
   return `Analyseer dit pand voor een Nederlandse vastgoedbelegger en roep de tool 'analyse_pand' aan.
 
 Invoer: ${ctx.query}
 Soort invoer: ${ctx.isUrl ? (ctx.isFundaInBusiness ? "URL (Funda in Business — commercieel)" : "URL (Funda/Pararius/Vendr)") : "Adres"}
-Pandtype (door gebruiker geselecteerd): ${ctx.pandtype}
+Pandtype: ${ctx.pandtype}
 ${fib}${priceLine}
 PDOK locatie: ${JSON.stringify(ctx.pdok ?? "onbekend")}
 BAG verblijfsobject: ${JSON.stringify(ctx.bag ?? "onbekend")}
 Monument/beschermd gezicht: ${JSON.stringify(ctx.monument)}
 Listing (ScraperAPI): ${JSON.stringify(ctx.listing ?? "onbekend")}
-Energielabel (EP Online): ${JSON.stringify(ctx.energie ?? "onbekend")}
-Altum AI waarderef: ${JSON.stringify(ctx.altum ?? "onbekend")}
+Energielabel: ${JSON.stringify(ctx.energie ?? "onbekend")}
 
-Instructies:
+============================
+MARKTWAARDE-BEREKENING (verplicht — gebruik deze methodiek voor marktwaarde_ai)
+============================
+Beschikbare data:
+- Gemeente: ${gemeente} · Buurt: ${buurt}
+- Pandtype: ${ctx.pandtype}
+- Woonoppervlakte: ${opp} m²
+- Bouwjaar: ${bouwjaar}
+- Energielabel: ${elabel}
+- Erfpacht: ${erfpacht}
+- Monument: ${monument}
+
+${wozBlock}
+
+Stappenplan:
+1. Start met de meest recente WOZ-waarde${latestWoz ? ` (€ ${latestWoz.toLocaleString("nl-NL")})` : ""}.
+2. Pas een markt-tot-WOZ ratio toe op basis van pandtype en locatie:
+   - Utrecht centrum appartement: WOZ × 1.35 tot 1.50
+   - Utrecht buiten centrum: WOZ × 1.20 tot 1.35
+   - Randstad overig (Amsterdam, Rotterdam, Den Haag): WOZ × 1.15 tot 1.30
+   - Buiten Randstad: WOZ × 1.05 tot 1.20
+   - Commercieel: gebruik BAR-methode (markthuur ÷ rendement) i.p.v. WOZ-ratio
+3. Pas correcties toe:
+   - Energielabel A/B: +3%
+   - Energielabel E/F/G: -5% tot -10%
+   - Monument: -5% (beperkte verbouwmogelijkheden)
+   - Erfpacht: -8% tot -12%
+   - Bouwjaar <1940: -3% (hogere onderhoudskosten)
+   - Bouwjaar >2010: +3% (moderne installaties)
+4. Bepaal:
+   - marktwaarde_ai: het puntwaarde (number, EUR)
+   - marktwaarde_bandbreedte_laag / marktwaarde_bandbreedte_hoog: realistische ondergrens en bovengrens (number, EUR)
+   - marktwaarde_onderbouwing: max 100 woorden Nederlands waarin je expliciet noemt: gebruikte WOZ-basis, toegepaste ratio (met %), toegepaste correcties (met %), en eindresultaat.
+
+Als WOZ-historie ontbreekt: schat marktwaarde op basis van vergelijkbare €/m² in de buurt en vermeld dit in de onderbouwing.
+
+============================
+OVERIGE INSTRUCTIES
+============================
 - score 1-10 (10 = uitstekende belegging).
 - risico velden 1-10 (10 = hoog risico).
-- marktwaarde_ai en huurwaarde_ai in euro (huurwaarde per maand voor woning, of leeg voor commercieel).
+- huurwaarde_ai in euro (maand voor woning, leeg/0 voor commercieel).
 - Voor commercieel: vul bar_bruto, nar_netto, leegstandsrisico, huurprijszone, commercieel_huurprijs_pm2 (€/m²/jr).
-- Voor nieuwbouw: vermeld dat WOZ niet beschikbaar is.
 - Geef 2-5 opmerkingen (erfpacht, monument, splitsing, OVB-tarief, BTW, etc.).
 - Investeringsthese max 200 woorden, Nederlands.`;
 }
