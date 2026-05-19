@@ -108,6 +108,9 @@ export interface AiAnalysis {
   score: number;
   risico: { locatie: number; staat: number; markt: number; liquiditeit: number };
   marktwaarde_ai: number;
+  marktwaarde_onderbouwing?: string;
+  marktwaarde_bandbreedte_laag?: number;
+  marktwaarde_bandbreedte_hoog?: number;
   huurwaarde_ai: number;
   transformatieadvies: string;
   marktcontext: string;
