@@ -121,20 +121,8 @@ export const analyzeProperty = createServerFn({ method: "POST" })
 
     const huisnummer = extractHuisnummer(pdok?.adres) ?? extractHuisnummer(addressForPdok);
 
-    // Fase 2: parallelle data-ophaal
-    // - Skip Altum AVM call wanneer client een gecachte marktwaarde meestuurt (1×/30d cache)
-    const altumPromise = data.cachedMarktwaarde
-      ? Promise.resolve({
-          bron: "altum_ai" as const,
-          marktwaarde: data.cachedMarktwaarde,
-          marktwaarde_source: "cached" as const,
-        })
-      : fetchAltum(pdok?.postcode, huisnummer).catch((e: any) => {
-          errors.altum = String(e?.message ?? e);
-          return null;
-        });
-
-    const [bagWfs, bagApi, monument, energie, altumRaw, wozReal] = await Promise.all([
+    // Fase 2: parallelle data-ophaal (Altum AVM is verwijderd — marktwaarde komt nu uit Claude AI)
+    const [bagWfs, bagApi, monument, energie, wozReal] = await Promise.all([
       fetchBagVbo(pdok?.bagId).catch((e: any) => {
         errors.bag_wfs = String(e?.message ?? e);
         return null;
@@ -151,33 +139,17 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         errors.ep_online = String(e?.message ?? e);
         return null;
       }),
-      altumPromise,
       fetchWozWaardeloket(pdok?.nummeraanduidingId).catch((e: any) => {
         errors.woz_loket = String(e?.message ?? e);
         return null;
       }),
     ]);
 
-    // Fallback marktwaarde via WOZ ×1,10 wanneer Altum gerate-limit is of geen waarde leverde
-    let altum: any = altumRaw;
-    if ((!altum || (altum as any)?.rate_limited || !altum?.marktwaarde) && wozReal && wozReal.length > 0) {
-      const latestWoz = wozReal[wozReal.length - 1].waarde;
-      altum = {
-        ...(altum ?? {}),
-        bron: "altum_ai" as const,
-        marktwaarde: Math.round(latestWoz * 1.1),
-        marktwaarde_source: "woz_x110" as const,
-      };
-    }
-
     const bag = bagApi ?? bagWfs;
     if (bagApi) bronnen.push("BAG API");
     else if (bagWfs) bronnen.push("BAG WFS");
     if (monument?.rijksmonument) bronnen.push("RCE Monumenten");
     if (energie) bronnen.push("EP Online");
-    if (altum?.marktwaarde && altum?.marktwaarde_source === "altum_avm") bronnen.push("Altum AI AVM");
-    if (altum?.marktwaarde_source === "cached") bronnen.push("Marktwaarde (cache 30d)");
-    if (altum?.marktwaarde_source === "woz_x110") bronnen.push("WOZ ×1,10 fallback");
     if (wozReal?.length) bronnen.push("WOZ Waardeloket");
 
     // Fase 3: AI primair (Lovable) + secundair (Anthropic) parallel
@@ -188,8 +160,8 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       bag,
       monument,
       listing,
-      altum,
       energie,
+      woz: wozReal,
       isUrl,
       isFundaInBusiness,
     });
@@ -202,7 +174,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       callAnthropic(prompt).catch(() => null),
     ]);
 
-    if (primary) bronnen.push("Lovable AI");
+    if (primary) bronnen.push("Claude AI marktwaarde");
     if (secondary) bronnen.push("Anthropic");
 
     // Energielabel — STRIKT GESCHEIDEN bronnen.
