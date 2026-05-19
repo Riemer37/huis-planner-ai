@@ -229,7 +229,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "EP-online energielabel", data: epLabel ?? "—", status: epLabel ? "ok" : "fail" },
       { naam: "Funda listing", data: listing?.funda_debug?.blocked ? "Geblokkeerd / geen echte pagina" : fundaLabel ? `Label ${fundaLabel}` : ((listing?.bron === "apify" || listing?.bron === "scraperapi") ? "Geen label" : "—"), status: listing?.funda_debug?.blocked ? "fail" : (listing?.bron === "apify" || listing?.bron === "scraperapi") ? "ok" : (isUrl ? "fail" : "estimate") },
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
-      { naam: "Marktwaarde", data: altum?.marktwaarde ? `€${altum.marktwaarde}${altum.marktwaarde_source === "woz_x110" ? " (WOZ ×1,10)" : altum.marktwaarde_source === "cached" ? " (cache)" : ""}` : "—", status: altum?.marktwaarde_source === "altum_avm" || altum?.marktwaarde_source === "cached" ? "ok" : altum?.marktwaarde ? "estimate" : "estimate" },
+      { naam: "Marktwaarde (Claude AI)", data: primary.marktwaarde_ai ? `€${primary.marktwaarde_ai.toLocaleString("nl-NL")}` : "—", status: primary.marktwaarde_ai ? "ok" : "fail" },
       { naam: "WOZ Waardeloket (Kadaster)", data: wozReal?.length ? `${wozReal.length} jaren` : "—", status: wozReal?.length ? "ok" : "fail" },
       { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
     ];
@@ -245,14 +245,10 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       monument: monument ?? { rijksmonument: false, beschermdGezicht: null },
       ai: primary,
       ai_secondary: secondary ?? undefined,
-      altum: altum ?? null,
+      altum: null,
       errors,
       bronnen,
-      woz: wozReal?.length
-        ? wozReal
-        : altum?.woz_geschat
-          ? synthesizeWoz(altum.woz_geschat * 1.1)
-          : synthesizeWoz(primary.marktwaarde_ai),
+      woz: wozReal?.length ? wozReal : synthesizeWoz(primary.marktwaarde_ai),
       energielabel,
       is_apartment: isApt,
       perceel_m2: data.pandtype === "commercieel" || isApt ? undefined : (listing?.perceel_m2 ?? 120),
@@ -261,14 +257,14 @@ export const analyzeProperty = createServerFn({ method: "POST" })
         adres: pdok ? "bag" : "schatting",
         woonplaats: pdok ? "bag" : "schatting",
         buurt: pdok?.buurt ? "bag" : "schatting",
-        living_area_m2: hasManual && manual!.living_area_m2 ? "handmatig" : listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : altum?.oppervlakte ? "altum_ai" : "schatting",
+        living_area_m2: hasManual && manual!.living_area_m2 ? "handmatig" : listing?.m2 && !listing.funda_debug?.blocked ? "funda" : bag?.oppervlakte ? "bag" : "schatting",
         plot_area_m2: hasManual && manual!.plot_area_m2 ? "handmatig" : isApt ? "bag" : listing?.perceel_m2 && !listing.funda_debug?.blocked ? "funda" : "schatting",
         build_year: hasManual && manual!.build_year ? "handmatig" : (bag as any)?.bouwjaar ? "bag" : listing?.bouwjaar && !listing.funda_debug?.blocked ? "funda" : "schatting",
         rooms: hasManual && manual!.rooms ? "handmatig" : listing?.kamers && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
         asking_price: hasManual && manual!.asking_price ? "handmatig" : listing?.prijs && !listing.funda_debug?.blocked && !hasManual ? "funda" : "schatting",
         energy_label: hasManual && manual!.energielabel ? "handmatig" : fundaLabel ? "funda" : epLabel ? "ep_online" : "schatting",
-        market_value: altum?.marktwaarde ? "altum_ai" : "schatting",
-        rent_value: altum?.huurwaarde ? "altum_ai" : "schatting",
+        market_value: primary.marktwaarde_ai ? "schatting" : "schatting",
+        rent_value: "schatting",
       },
 
     };
