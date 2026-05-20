@@ -1,5 +1,5 @@
 import type { PropertyAnalysis } from "@/lib/types";
-import { fmtEUR, fmtPct } from "@/lib/calculations";
+import { fmtEUR, fmtPct, getMarktwaarde, hasManualMarktwaarde } from "@/lib/calculations";
 
 function RiskBar({ label, value }: { label: string; value: number }) {
   const color = value >= 7 ? "bg-destructive" : value >= 5 ? "bg-warning" : "bg-positive";
