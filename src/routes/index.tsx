@@ -122,9 +122,14 @@ function VastgoedAI() {
         ) : (
           <>
             <PropertyHeader a={analysis} />
+            <MyEstimate
+              a={analysis}
+              onUpdate={(next) => { saveAnalysis(next); setAnalysis(next); }}
+            />
             <KpiStrip a={analysis} />
             <Warnings a={analysis} />
             <div className="px-6 border-b border-border bg-card">
+
               <div className="flex gap-1 overflow-x-auto">
                 {TABS.map((t) => (
                   <button
