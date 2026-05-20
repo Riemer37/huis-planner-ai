@@ -22,12 +22,12 @@ export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
   const ovb = Math.round(bod * (ovbPct / 100));
   const bijkomend = notaris + taxatie + keuring + overig;
   const totaal = bod + ovb + bijkomend;
-  const verschilMarktwaarde = bod - a.ai.marktwaarde_ai;
-  const verschilPct = (verschilMarktwaarde / a.ai.marktwaarde_ai) * 100;
+  const verschilMarktwaarde = bod - marktwaarde;
+  const verschilPct = marktwaarde > 0 ? (verschilMarktwaarde / marktwaarde) * 100 : 0;
   const maxBod = berekenMaxBod(a, roi, reno.totaal, eigenGebruik);
   const margeMax = maxBod - vraag;
   const margePct = (margeMax / vraag) * 100;
-  const box3 = berekenBox3(a.woz?.[0]?.waarde ?? a.ai.marktwaarde_ai, hypotheek, partners);
+  const box3 = berekenBox3(a.woz?.[0]?.waarde ?? marktwaarde, hypotheek, partners);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
