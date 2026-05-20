@@ -132,7 +132,7 @@ export function berekenBox3(woz: number, hypotheek: number, partners: boolean): 
 
 export function berekenMaxBod(a: PropertyAnalysis, gewensteROI: number, renovatie: number, eigenGebruik: boolean): number {
   // Formule: Max bod = Marktwaarde − Renovatiekosten − Aankoopkosten − (Marktwaarde × ROI%)
-  const marktwaarde = a.ai.marktwaarde_ai;
+  const marktwaarde = getMarktwaarde(a);
   const ovbPct = ovbTarief(a.pandtype, eigenGebruik) / 100;
   const aankoopkosten = Math.round(marktwaarde * ovbPct) + 6000; // OVB + notaris/taxatie/keuring
   const roiKorting = Math.round(marktwaarde * (gewensteROI / 100));
@@ -141,7 +141,7 @@ export function berekenMaxBod(a: PropertyAnalysis, gewensteROI: number, renovati
 }
 
 export function maxBodBreakdown(a: PropertyAnalysis, gewensteROI: number, renovatie: number, eigenGebruik: boolean) {
-  const marktwaarde = a.ai.marktwaarde_ai;
+  const marktwaarde = getMarktwaarde(a);
   const ovbPct = ovbTarief(a.pandtype, eigenGebruik);
   const ovb = Math.round(marktwaarde * (ovbPct / 100));
   const bijkomend = 6000;
