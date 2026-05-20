@@ -74,9 +74,11 @@ export function berekenRenovatiekosten(a: PropertyAnalysis): { totaal: number; i
   }
   items.push({ naam: "Schilderwerk & afwerking", kosten: Math.round(m2 * 90), prio: "Optioneel" });
 
-  const totaal = items.reduce((s, it) => s + it.kosten, 0);
+  const sf = staatFactor(a.manual_overrides?.staat);
+  const scaledItems = sf === 1 ? items : items.map((it) => ({ ...it, kosten: Math.round(it.kosten * sf) }));
+  const totaal = scaledItems.reduce((s, it) => s + it.kosten, 0);
   // Sanity floor
-  return { totaal: Math.max(totaal, Math.round(m2 * baseM2 * 0.15)), items };
+  return { totaal: Math.max(totaal, Math.round(m2 * baseM2 * 0.15)), items: scaledItems };
 }
 
 export function berekenPotentieel(a: PropertyAnalysis) {
