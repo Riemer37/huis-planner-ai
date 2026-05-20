@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Home, TrendingUp, Hammer, Key, Shield, Percent } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { fmtEUR, fmtPct, berekenMaxBod, berekenRenovatiekosten } from "@/lib/calculations";
+import { fmtEUR, fmtPct, berekenMaxBod, berekenRenovatiekosten, getMarktwaarde, hasManualMarktwaarde } from "@/lib/calculations";
 
 function Tile({
   label,
