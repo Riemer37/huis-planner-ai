@@ -1,5 +1,5 @@
 import type { PropertyAnalysis } from "@/lib/types";
-import { fmtEUR, fmtPct } from "@/lib/calculations";
+import { fmtEUR, fmtPct, getMarktwaarde, hasManualMarktwaarde } from "@/lib/calculations";
 
 function RiskBar({ label, value }: { label: string; value: number }) {
   const color = value >= 7 ? "bg-destructive" : value >= 5 ? "bg-warning" : "bg-positive";
@@ -17,11 +17,9 @@ function RiskBar({ label, value }: { label: string; value: number }) {
 }
 
 export function OverviewTab({ a }: { a: PropertyAnalysis }) {
-  const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
-  const marktwaarde = a.ai.marktwaarde_ai;
-  const bandLaag = a.ai.marktwaarde_bandbreedte_laag;
-  const bandHoog = a.ai.marktwaarde_bandbreedte_hoog;
-  const onderbouwing = a.ai.marktwaarde_onderbouwing;
+  const marktwaarde = getMarktwaarde(a);
+  const manual = hasManualMarktwaarde(a);
+  const vraag = a.listing?.prijs ?? marktwaarde;
   const afwijking = ((marktwaarde - vraag) / vraag) * 100;
   const afwColor = Math.abs(afwijking) < 5 ? "text-muted-foreground" : afwijking > 0 ? "text-positive" : "text-destructive";
 
@@ -62,25 +60,31 @@ export function OverviewTab({ a }: { a: PropertyAnalysis }) {
           <div className="space-y-1 text-sm tabular">
             <div className="flex justify-between"><span className="text-muted-foreground">Vraagprijs</span><span>{fmtEUR(a.listing?.prijs)}</span></div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Marktwaarde</span>
+              <span className="text-muted-foreground">Jouw marktwaarde</span>
               <span className="inline-flex items-center gap-2">
                 {fmtEUR(marktwaarde)}
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-purple-500/15 text-purple-700 border border-purple-500/40">Claude AI</span>
+                {manual ? (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-positive/15 text-positive border border-positive/40">Handmatig</span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-warning/15 text-warning border border-warning/40">WOZ × 1,15</span>
+                )}
               </span>
             </div>
-            {(bandLaag && bandHoog) ? (
-              <div className="flex justify-between"><span className="text-muted-foreground">Bandbreedte</span><span>{fmtEUR(bandLaag)} — {fmtEUR(bandHoog)}</span></div>
-            ) : null}
             <div className="flex justify-between"><span className="text-muted-foreground">Afwijking t.o.v. vraagprijs</span><span className={afwColor}>{fmtPct(afwijking)}</span></div>
-            {onderbouwing && (
-              <div className="pt-3 mt-2 border-t border-border">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Onderbouwing (Claude AI)</div>
-                <p className="text-[12px] leading-relaxed text-foreground">{onderbouwing}</p>
+            {!manual && (
+              <div className="text-[11px] text-warning pt-2">
+                Vul je eigen marktwaardeschatting in (bovenaan de pagina) voor accurate berekeningen.
               </div>
             )}
-            <div className="text-[11px] text-muted-foreground pt-2">Methode: WOZ-historie + ratio per locatie + correcties (energielabel, monument, erfpacht, bouwjaar).</div>
+            {a.manual_overrides?.bijzonderheden && (
+              <div className="pt-3 mt-2 border-t border-border">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Jouw bijzonderheden</div>
+                <p className="text-[12px] leading-relaxed text-foreground">{a.manual_overrides.bijzonderheden}</p>
+              </div>
+            )}
           </div>
         </div>
+
 
 
         {(a.pandtype === "commercieel" || a.pandtype === "gemengd") && (a.ai.bar_bruto || a.ai.nar_netto) && (

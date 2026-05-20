@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { PropertyHeader } from "@/components/PropertyHeader";
 import { KpiStrip } from "@/components/KpiStrip";
 import { Warnings } from "@/components/Warnings";
+import { MyEstimate } from "@/components/MyEstimate";
 import { OverviewTab } from "@/components/tabs/OverviewTab";
 import { KadasterTab } from "@/components/tabs/KadasterTab";
 import { PotentialTab } from "@/components/tabs/PotentialTab";
@@ -121,9 +122,14 @@ function VastgoedAI() {
         ) : (
           <>
             <PropertyHeader a={analysis} />
+            <MyEstimate
+              a={analysis}
+              onUpdate={(next) => { saveAnalysis(next); setAnalysis(next); }}
+            />
             <KpiStrip a={analysis} />
             <Warnings a={analysis} />
             <div className="px-6 border-b border-border bg-card">
+
               <div className="flex gap-1 overflow-x-auto">
                 {TABS.map((t) => (
                   <button

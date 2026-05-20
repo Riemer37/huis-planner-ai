@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Home, TrendingUp, Hammer, Key, Shield, Percent } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { fmtEUR, fmtPct, berekenMaxBod, berekenRenovatiekosten } from "@/lib/calculations";
+import { fmtEUR, fmtPct, berekenMaxBod, berekenRenovatiekosten, getMarktwaarde, hasManualMarktwaarde } from "@/lib/calculations";
 
 function Tile({
   label,
@@ -32,8 +32,10 @@ export function KpiStrip({ a }: { a: PropertyAnalysis }) {
   const reno = berekenRenovatiekosten(a);
   const maxBod = berekenMaxBod(a, 10, reno.totaal, a.pandtype === "woning");
   const vraag = a.listing?.prijs;
-  const marge = maxBod - (vraag ?? a.ai.marktwaarde_ai);
-  const margePct = ((marge) / Math.max(1, vraag ?? a.ai.marktwaarde_ai)) * 100;
+  const marktwaarde = getMarktwaarde(a);
+  const manual = hasManualMarktwaarde(a);
+  const marge = maxBod - (vraag ?? marktwaarde);
+  const margePct = ((marge) / Math.max(1, vraag ?? marktwaarde)) * 100;
   const risico = Math.round((a.ai.risico.locatie + a.ai.risico.staat + a.ai.risico.markt + a.ai.risico.liquiditeit) / 4);
   const risicoColor = risico >= 7 ? "text-destructive" : risico >= 5 ? "text-warning" : "text-positive";
   const margeColor = marge >= 0 ? "text-positive" : "text-destructive";
@@ -41,7 +43,13 @@ export function KpiStrip({ a }: { a: PropertyAnalysis }) {
   return (
     <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 border-b border-border bg-background">
       <Tile icon={Home} label="Vraagprijs" value={vraag ? fmtEUR(vraag) : "—"} sub={vraag ? undefined : "Geen listing"} />
-      <Tile icon={TrendingUp} label="Marktwaarde AI" value={fmtEUR(a.ai.marktwaarde_ai)} sub="AI-schatting" />
+      <Tile
+        icon={TrendingUp}
+        label="Jouw marktwaarde"
+        value={fmtEUR(marktwaarde)}
+        sub={manual ? "Handmatig ingevoerd" : "Suggestie WOZ × 1,15"}
+        color={manual ? undefined : "text-warning"}
+      />
       <Tile icon={Hammer} label="Max. bod 10% ROI" value={fmtEUR(maxBod)} />
       <Tile
         icon={Key}

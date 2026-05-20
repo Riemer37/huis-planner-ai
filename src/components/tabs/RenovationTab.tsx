@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { berekenRenovatiekosten, fmtEUR } from "@/lib/calculations";
+import { berekenRenovatiekosten, fmtEUR, getMarktwaarde } from "@/lib/calculations";
 
 export function RenovationTab({ a }: { a: PropertyAnalysis }) {
   const auto = useMemo(() => berekenRenovatiekosten(a), [a]);
   const [budget, setBudget] = useState(auto.totaal);
+  const marktwaarde = getMarktwaarde(a);
   const factor = a.pandtype === "commercieel" ? 0.6 : 0.7;
   const waardestijging = Math.round(budget * factor);
-  const arv = a.ai.marktwaarde_ai + waardestijging;
-  const totaalInv = (a.listing?.prijs ?? a.ai.marktwaarde_ai) + budget + 15000;
+  const arv = marktwaarde + waardestijging;
+  const totaalInv = (a.listing?.prijs ?? marktwaarde) + budget + 15000;
   const marge = arv - totaalInv;
   const m2 = a.listing?.m2 ?? a.bag?.oppervlakte ?? 0;
 

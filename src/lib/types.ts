@@ -46,6 +46,8 @@ export interface FundaDebug {
   logs: string[];
 }
 
+export type StaatVanOnderhoud = "uitstekend" | "goed" | "redelijk" | "slecht";
+
 export interface ManualOverrides {
   energielabel?: string;
   living_area_m2?: number;
@@ -55,9 +57,10 @@ export interface ManualOverrides {
   rooms?: number;
   build_year?: number;
   woning_type?: string;
-  staat?: string;
+  staat?: StaatVanOnderhoud | string;
   erfpacht?: boolean;
   bijzonderheden?: string;
+  marktwaarde?: number;
 }
 
 export interface PrefillResult {

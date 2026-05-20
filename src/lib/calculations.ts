@@ -1,4 +1,34 @@
-import type { PropertyAnalysis, PandType } from "./types";
+import type { PropertyAnalysis, PandType, StaatVanOnderhoud } from "./types";
+
+/** Effectieve marktwaarde: handmatige invoer wint, anders WOZ × 1,15 (suggestie), anders AI-fallback. */
+export function getMarktwaarde(a: PropertyAnalysis): number {
+  const m = a.manual_overrides?.marktwaarde;
+  if (typeof m === "number" && m > 0) return m;
+  return suggestedMarktwaarde(a);
+}
+
+/** WOZ × 1,15 suggestie als startwaarde voor handmatig veld. */
+export function suggestedMarktwaarde(a: PropertyAnalysis): number {
+  const woz = a.woz?.[0]?.waarde;
+  if (typeof woz === "number" && woz > 0) return Math.round(woz * 1.15);
+  return a.ai?.marktwaarde_ai ?? 0;
+}
+
+export function hasManualMarktwaarde(a: PropertyAnalysis): boolean {
+  const m = a.manual_overrides?.marktwaarde;
+  return typeof m === "number" && m > 0;
+}
+
+export function staatFactor(s?: string): number {
+  switch ((s ?? "").toLowerCase()) {
+    case "uitstekend": return 0.7;
+    case "goed": return 0.9;
+    case "redelijk": return 1.15;
+    case "slecht": return 1.45;
+    default: return 1;
+  }
+}
+
 
 export const fmtEUR = (n?: number, frac = 0) =>
   typeof n === "number" && isFinite(n)
@@ -44,9 +74,11 @@ export function berekenRenovatiekosten(a: PropertyAnalysis): { totaal: number; i
   }
   items.push({ naam: "Schilderwerk & afwerking", kosten: Math.round(m2 * 90), prio: "Optioneel" });
 
-  const totaal = items.reduce((s, it) => s + it.kosten, 0);
+  const sf = staatFactor(a.manual_overrides?.staat);
+  const scaledItems = sf === 1 ? items : items.map((it) => ({ ...it, kosten: Math.round(it.kosten * sf) }));
+  const totaal = scaledItems.reduce((s, it) => s + it.kosten, 0);
   // Sanity floor
-  return { totaal: Math.max(totaal, Math.round(m2 * baseM2 * 0.15)), items };
+  return { totaal: Math.max(totaal, Math.round(m2 * baseM2 * 0.15)), items: scaledItems };
 }
 
 export function berekenPotentieel(a: PropertyAnalysis) {
@@ -100,7 +132,7 @@ export function berekenBox3(woz: number, hypotheek: number, partners: boolean): 
 
 export function berekenMaxBod(a: PropertyAnalysis, gewensteROI: number, renovatie: number, eigenGebruik: boolean): number {
   // Formule: Max bod = Marktwaarde − Renovatiekosten − Aankoopkosten − (Marktwaarde × ROI%)
-  const marktwaarde = a.ai.marktwaarde_ai;
+  const marktwaarde = getMarktwaarde(a);
   const ovbPct = ovbTarief(a.pandtype, eigenGebruik) / 100;
   const aankoopkosten = Math.round(marktwaarde * ovbPct) + 6000; // OVB + notaris/taxatie/keuring
   const roiKorting = Math.round(marktwaarde * (gewensteROI / 100));
@@ -109,7 +141,7 @@ export function berekenMaxBod(a: PropertyAnalysis, gewensteROI: number, renovati
 }
 
 export function maxBodBreakdown(a: PropertyAnalysis, gewensteROI: number, renovatie: number, eigenGebruik: boolean) {
-  const marktwaarde = a.ai.marktwaarde_ai;
+  const marktwaarde = getMarktwaarde(a);
   const ovbPct = ovbTarief(a.pandtype, eigenGebruik);
   const ovb = Math.round(marktwaarde * (ovbPct / 100));
   const bijkomend = 6000;

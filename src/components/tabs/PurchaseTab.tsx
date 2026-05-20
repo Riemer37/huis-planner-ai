@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { berekenBox3, berekenMaxBod, berekenRenovatiekosten, fmtEUR, fmtPct, ovbTarief, maxBodBreakdown } from "@/lib/calculations";
+import { berekenBox3, berekenMaxBod, berekenRenovatiekosten, fmtEUR, fmtPct, ovbTarief, maxBodBreakdown, getMarktwaarde } from "@/lib/calculations";
 
 export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
-  const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
+  const marktwaarde = getMarktwaarde(a);
+  const vraag = a.listing?.prijs ?? marktwaarde;
   const [bodPct, setBodPct] = useState(0);
   const [eigenGebruik, setEigenGebruik] = useState(a.pandtype === "woning");
   const [notaris, setNotaris] = useState(1500);
@@ -21,12 +22,12 @@ export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
   const ovb = Math.round(bod * (ovbPct / 100));
   const bijkomend = notaris + taxatie + keuring + overig;
   const totaal = bod + ovb + bijkomend;
-  const verschilMarktwaarde = bod - a.ai.marktwaarde_ai;
-  const verschilPct = (verschilMarktwaarde / a.ai.marktwaarde_ai) * 100;
+  const verschilMarktwaarde = bod - marktwaarde;
+  const verschilPct = marktwaarde > 0 ? (verschilMarktwaarde / marktwaarde) * 100 : 0;
   const maxBod = berekenMaxBod(a, roi, reno.totaal, eigenGebruik);
   const margeMax = maxBod - vraag;
   const margePct = (margeMax / vraag) * 100;
-  const box3 = berekenBox3(a.woz?.[0]?.waarde ?? a.ai.marktwaarde_ai, hypotheek, partners);
+  const box3 = berekenBox3(a.woz?.[0]?.waarde ?? marktwaarde, hypotheek, partners);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
