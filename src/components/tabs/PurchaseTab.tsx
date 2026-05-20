@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { berekenBox3, berekenMaxBod, berekenRenovatiekosten, fmtEUR, fmtPct, ovbTarief, maxBodBreakdown } from "@/lib/calculations";
+import { berekenBox3, berekenMaxBod, berekenRenovatiekosten, fmtEUR, fmtPct, ovbTarief, maxBodBreakdown, getMarktwaarde } from "@/lib/calculations";
 
 export function PurchaseTab({ a }: { a: PropertyAnalysis }) {
-  const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
+  const marktwaarde = getMarktwaarde(a);
+  const vraag = a.listing?.prijs ?? marktwaarde;
   const [bodPct, setBodPct] = useState(0);
   const [eigenGebruik, setEigenGebruik] = useState(a.pandtype === "woning");
   const [notaris, setNotaris] = useState(1500);
