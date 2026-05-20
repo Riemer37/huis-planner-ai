@@ -17,11 +17,9 @@ function RiskBar({ label, value }: { label: string; value: number }) {
 }
 
 export function OverviewTab({ a }: { a: PropertyAnalysis }) {
-  const vraag = a.listing?.prijs ?? a.ai.marktwaarde_ai;
-  const marktwaarde = a.ai.marktwaarde_ai;
-  const bandLaag = a.ai.marktwaarde_bandbreedte_laag;
-  const bandHoog = a.ai.marktwaarde_bandbreedte_hoog;
-  const onderbouwing = a.ai.marktwaarde_onderbouwing;
+  const marktwaarde = getMarktwaarde(a);
+  const manual = hasManualMarktwaarde(a);
+  const vraag = a.listing?.prijs ?? marktwaarde;
   const afwijking = ((marktwaarde - vraag) / vraag) * 100;
   const afwColor = Math.abs(afwijking) < 5 ? "text-muted-foreground" : afwijking > 0 ? "text-positive" : "text-destructive";
 
