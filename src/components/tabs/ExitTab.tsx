@@ -81,7 +81,7 @@ function Verhuur({ a }: { a: PropertyAnalysis }) {
   const [leegstand, setLeegstand] = useState(5);
   const [stijging, setStijging] = useState(2);
 
-  const aankoop = a.listing?.prijs ?? a.ai.marktwaarde_ai;
+  const aankoop = a.listing?.prijs ?? getMarktwaarde(a);
   const jaarhuur = maandhuur * 12 * (1 - leegstand / 100);
   const bruto = berekenBAR(jaarhuur, aankoop);
   const netto = berekenNAR(jaarhuur, aankoop);
