@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { PropertyAnalysis } from "@/lib/types";
-import { berekenBAR, berekenNAR, berekenRenovatiekosten, berekenWWS, fmtEUR, fmtPct } from "@/lib/calculations";
+import { berekenBAR, berekenNAR, berekenRenovatiekosten, berekenWWS, fmtEUR, fmtPct, getMarktwaarde } from "@/lib/calculations";
 
 export function ExitTab({ a }: { a: PropertyAnalysis }) {
   const [tab, setTab] = useState<"verkoop" | "verhuur">("verkoop");
