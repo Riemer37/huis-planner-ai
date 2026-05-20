@@ -139,7 +139,7 @@ export function MyEstimate({
               value={bijzonderheden}
               onChange={(e) => setBijzonderheden(e.target.value)}
               onBlur={() => commit({ bijzonderheden: bijzonderheden || undefined })}
-              placeholder='Bijv. "veel achterstallig onderhoud zichtbaar op foto\'s"'
+              placeholder={'Bijv. "veel achterstallig onderhoud zichtbaar op foto\'s"'}
               rows={3}
               className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm leading-snug resize-y"
             />
