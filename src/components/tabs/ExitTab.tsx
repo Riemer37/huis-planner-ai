@@ -25,9 +25,10 @@ function SubTab({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function Verkoop({ a }: { a: PropertyAnalysis }) {
   const reno = useMemo(() => berekenRenovatiekosten(a), [a]);
+  const marktwaarde = getMarktwaarde(a);
   const factor = a.pandtype === "commercieel" ? 0.6 : 0.7;
-  const [arv, setArv] = useState(a.ai.marktwaarde_ai + Math.round(reno.totaal * factor));
-  const aankoop = a.listing?.prijs ?? a.ai.marktwaarde_ai;
+  const [arv, setArv] = useState(marktwaarde + Math.round(reno.totaal * factor));
+  const aankoop = a.listing?.prijs ?? marktwaarde;
   const totaalInv = aankoop + reno.totaal + 15000;
   const makelaar = Math.round(arv * 0.015);
   const verkoopkosten = 2500;
