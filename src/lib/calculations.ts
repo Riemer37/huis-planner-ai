@@ -1,4 +1,34 @@
-import type { PropertyAnalysis, PandType } from "./types";
+import type { PropertyAnalysis, PandType, StaatVanOnderhoud } from "./types";
+
+/** Effectieve marktwaarde: handmatige invoer wint, anders WOZ × 1,15 (suggestie), anders AI-fallback. */
+export function getMarktwaarde(a: PropertyAnalysis): number {
+  const m = a.manual_overrides?.marktwaarde;
+  if (typeof m === "number" && m > 0) return m;
+  return suggestedMarktwaarde(a);
+}
+
+/** WOZ × 1,15 suggestie als startwaarde voor handmatig veld. */
+export function suggestedMarktwaarde(a: PropertyAnalysis): number {
+  const woz = a.woz?.[0]?.waarde;
+  if (typeof woz === "number" && woz > 0) return Math.round(woz * 1.15);
+  return a.ai?.marktwaarde_ai ?? 0;
+}
+
+export function hasManualMarktwaarde(a: PropertyAnalysis): boolean {
+  const m = a.manual_overrides?.marktwaarde;
+  return typeof m === "number" && m > 0;
+}
+
+export function staatFactor(s?: string): number {
+  switch ((s ?? "").toLowerCase()) {
+    case "uitstekend": return 0.7;
+    case "goed": return 0.9;
+    case "redelijk": return 1.15;
+    case "slecht": return 1.45;
+    default: return 1;
+  }
+}
+
 
 export const fmtEUR = (n?: number, frac = 0) =>
   typeof n === "number" && isFinite(n)
