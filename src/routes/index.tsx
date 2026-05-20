@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { PropertyHeader } from "@/components/PropertyHeader";
 import { KpiStrip } from "@/components/KpiStrip";
 import { Warnings } from "@/components/Warnings";
+import { MyEstimate } from "@/components/MyEstimate";
 import { OverviewTab } from "@/components/tabs/OverviewTab";
 import { KadasterTab } from "@/components/tabs/KadasterTab";
 import { PotentialTab } from "@/components/tabs/PotentialTab";
