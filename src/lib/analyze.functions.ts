@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   buildPrompt,
-  callAnthropic,
-  callLovableAI,
+  callClaudeAnalysis,
   cryptoRandomId,
   fallbackAI,
   fetchBagApi,
@@ -48,6 +48,7 @@ function extractHuisnummer(adres?: string): string | undefined {
 }
 
 export const analyzeProperty = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => InputSchema.parse(i))
   .handler(async ({ data }): Promise<PropertyAnalysis> => {
     const errors: Record<string, string> = {};
@@ -151,7 +152,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
     if (energie) bronnen.push("EP Online");
     if (wozReal?.length) bronnen.push("WOZ Waardeloket");
 
-    // Fase 3: AI primair (Lovable) + secundair (Anthropic) parallel
+    // Fase 3: AI-analyse via Claude
     const prompt = buildPrompt({
       query: data.query,
       pandtype: data.pandtype,
@@ -165,16 +166,13 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       isFundaInBusiness,
     });
 
-    const [primary, secondary] = await Promise.all([
-      callLovableAI(prompt).catch((e: any) => {
-        errors.ai = e.message;
-        return fallbackAI(data.pandtype);
-      }),
-      callAnthropic(prompt).catch(() => null),
-    ]);
+    const primary = await callClaudeAnalysis(prompt).catch((e: any) => {
+      errors.ai = e.message;
+      return fallbackAI(data.pandtype);
+    });
+    const secondary = null;
 
-    if (primary) bronnen.push("Claude AI marktwaarde");
-    if (secondary) bronnen.push("Anthropic");
+    if (!errors.ai) bronnen.push("Claude AI");
 
     // Energielabel — STRIKT GESCHEIDEN bronnen.
     // - Funda URL ingevoerd → ALLEEN Funda label (geen EP-online fallback). Mist het, dan handmatige invoer.
@@ -230,7 +228,7 @@ export const analyzeProperty = createServerFn({ method: "POST" })
       { naam: "RCE Rijksmonumenten", data: monument?.rijksmonument ? "Rijksmonument" : "Geen monument", status: monument ? "ok" : "fail" },
       { naam: "Marktwaarde (Claude AI)", data: primary.marktwaarde_ai ? `€${primary.marktwaarde_ai.toLocaleString("nl-NL")}` : "—", status: primary.marktwaarde_ai ? "ok" : "fail" },
       { naam: "WOZ Waardeloket (Kadaster)", data: wozReal?.length ? `${wozReal.length} jaren` : "—", status: wozReal?.length ? "ok" : "fail" },
-      { naam: "Lovable AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
+      { naam: "Claude AI analyse", data: `Score ${primary.score}/10 · ${primary.advies}`, status: errors.ai ? "fail" : "ok" },
     ];
 
     const result: PropertyAnalysis = {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Search, Trash2, Building2, History } from "lucide-react";
+import { Loader2, Search, Trash2, History } from "lucide-react";
 import type { PandType, PropertyAnalysis } from "@/lib/types";
 import { clearAllLocalStorageEntries, loadHistory, deleteAnalysis } from "@/lib/storage";
 import { fmtEUR } from "@/lib/calculations";
@@ -58,20 +58,7 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
   };
 
   return (
-    <aside className="w-[280px] shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0 shadow-sidebar z-20">
-      {/* Brand */}
-      <div className="px-5 py-5 border-b border-sidebar-border flex items-center gap-3">
-        <div className="size-9 rounded-md bg-navy flex items-center justify-center">
-          <Building2 className="size-5 text-primary-foreground" strokeWidth={2.4} />
-        </div>
-        <div>
-          <div className="font-bold tracking-tight text-[15px] display text-navy">
-            VastgoedAI
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-0.5">Investment Terminal</div>
-        </div>
-      </div>
-
+    <aside className="hidden md:flex w-[280px] shrink-0 bg-sidebar text-sidebar-foreground flex-col h-[calc(100vh-3.5rem)] sticky top-14 shadow-sidebar z-20">
       {/* Search / analyse */}
       <div className="p-4 space-y-3 border-b border-sidebar-border">
         <label className="label-eyebrow block">Funda-URL of adres</label>
@@ -188,7 +175,7 @@ export function Sidebar({ onAnalyze, onSelectHistory, loading, loadingStages, cu
 
       <div className="px-4 py-3 text-[10px] uppercase tracking-[0.15em] text-muted-foreground border-t border-sidebar-border flex items-center justify-between">
         <span>Cache 24u</span>
-        <span className="text-navy font-semibold">Lovable AI</span>
+        <span className="text-navy font-semibold">Claude AI</span>
       </div>
     </aside>
   );

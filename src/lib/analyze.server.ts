@@ -864,30 +864,8 @@ export async function fetchRijksmonument(lat?: number, lon?: number) {
 
 export type AiAnalysisShape = import("./types").AiAnalysis;
 
-export async function callLovableAI(prompt: string): Promise<AiAnalysisShape> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      temperature: 0,
-      messages: [
-        {
-          role: "system",
-          content:
-            "Je bent een Nederlandse vastgoedanalist. Geef ALTIJD geldig JSON terug volgens het opgegeven schema. Tekstvelden in het Nederlands. Geen markdown, geen uitleg buiten JSON.",
-        },
-        { role: "user", content: prompt },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "analyse_pand",
-            description: "Geef vastgoed-investeringsanalyse",
-            parameters: {
+// ---------- Claude — primaire vastgoedanalyse (gestructureerd via tool use) ----------
+const ANALYSE_SCHEMA = {
               type: "object",
               properties: {
                 investeringsthese: { type: "string" },
@@ -935,23 +913,39 @@ export async function callLovableAI(prompt: string): Promise<AiAnalysisShape> {
                 "opmerkingen",
               ],
               additionalProperties: false,
-            },
-          },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: "analyse_pand" } },
+            };
+
+export async function callClaudeAnalysis(prompt: string): Promise<AiAnalysisShape> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY ontbreekt");
+  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 2500,
+      temperature: 0,
+      system:
+        "Je bent een Nederlandse vastgoedanalist. Lever je analyse uitsluitend via de tool analyse_pand. Tekstvelden in het Nederlands.",
+      tools: [{ name: "analyse_pand", description: "Geef vastgoed-investeringsanalyse", input_schema: ANALYSE_SCHEMA }],
+      tool_choice: { type: "tool", name: "analyse_pand" },
+      messages: [{ role: "user", content: prompt }],
     }),
   });
-  if (!resp.ok) {
-    const body = await resp.text();
-    if (resp.status === 429) throw new Error("AI rate limit overschreden, probeer later opnieuw.");
-    if (resp.status === 402) throw new Error("AI credits op. Vul credits aan in Settings → Workspace → Usage.");
-    throw new Error(`AI gateway ${resp.status}: ${body.slice(0, 200)}`);
+  if (!r.ok) {
+    const body = await r.text();
+    if (r.status === 429) throw new Error("AI rate limit overschreden, probeer later opnieuw.");
+    throw new Error(`Claude ${r.status}: ${body.slice(0, 200)}`);
   }
-  const j: any = await resp.json();
-  const args = j?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-  if (!args) throw new Error("AI: geen structureel antwoord");
-  return JSON.parse(args) as AiAnalysisShape;
+  const j: any = await r.json();
+  const tool = (j?.content ?? []).find((c: any) => c?.type === "tool_use");
+  if (!tool?.input) throw new Error("AI: geen gestructureerd antwoord");
+  return tool.input as AiAnalysisShape;
 }
 
 export function cryptoRandomId() {
@@ -978,7 +972,7 @@ export function fallbackAI(pandtype: import("./types").PandType): AiAnalysisShap
     marktcontext: "—",
     pandtype_bevestiging: pandtype,
     commercieel_huurprijs_pm2: pandtype === "commercieel" ? 150 : null,
-    opmerkingen: ["AI-analyse mislukt — controleer Lovable AI credits."],
+    opmerkingen: ["AI-analyse mislukt — controleer de ANTHROPIC_API_KEY."],
   };
 }
 

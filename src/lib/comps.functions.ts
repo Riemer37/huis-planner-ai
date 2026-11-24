@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type CompStaat = "instapklaar" | "redelijk" | "renovatie" | "onbekend";
 
@@ -59,6 +60,7 @@ function num(v: unknown): number | undefined {
 }
 
 export const getComparables = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data }): Promise<CompsResult> => {
     const key = process.env.ALTUM_AI_API_KEY;

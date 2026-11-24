@@ -1,240 +1,210 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { Sidebar } from "@/components/Sidebar";
-import { PropertyHeader } from "@/components/PropertyHeader";
-import { KpiStrip } from "@/components/KpiStrip";
-import { Warnings } from "@/components/Warnings";
-import { MyEstimate } from "@/components/MyEstimate";
-import { OverviewTab } from "@/components/tabs/OverviewTab";
-import { KadasterTab } from "@/components/tabs/KadasterTab";
-import { PotentialTab } from "@/components/tabs/PotentialTab";
-import { PurchaseTab } from "@/components/tabs/PurchaseTab";
-import { RenovationTab } from "@/components/tabs/RenovationTab";
-import { ExitTab } from "@/components/tabs/ExitTab";
-
-import { analyzeProperty } from "@/lib/analyze.functions";
-import { clearCachedInput, findCached, saveAnalysis } from "@/lib/storage";
-import type { PandType, PropertyAnalysis } from "@/lib/types";
-import heroImage from "@/assets/hero-architecture.jpg";
-import { Search, Loader2 } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { Camera, ImageOff, Loader2, Plus, Search } from "lucide-react";
+import { AppShell, PageHeader } from "@/components/AppShell";
+import { StatusBadge, EnergieLabel } from "@/components/bezichtiging/Badges";
+import {
+  STATUSSEN,
+  datumKort,
+  eur,
+  getal,
+  lijstBezichtigingen,
+  omslagFotos,
+  prijsPerM2,
+} from "@/lib/bezichtigingen";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
-  component: VastgoedAI,
-  head: () => ({
-    meta: [
-      { title: "VastgoedAI — Beleggingsanalyse" },
-      { name: "description", content: "Nederlandse vastgoed-beleggingstool: aankoopadvies, max bod, risico's en rendement." },
-    ],
-  }),
+  component: Overzicht,
+  head: () => ({ meta: [{ title: "Bezichtigingen — VastgoedAI" }] }),
 });
 
-const TABS = [
-  { id: "overzicht", label: "Overzicht" },
-  { id: "kadaster", label: "Kadaster & Data" },
-  { id: "potentieel", label: "Potentieel" },
-  { id: "aankoop", label: "Aankoop" },
-  { id: "renovatie", label: "Renovatie" },
-  { id: "exit", label: "Exitstrategie" },
-] as const;
+function Overzicht() {
+  return (
+    <AppShell>
+      <OverzichtInhoud />
+    </AppShell>
+  );
+}
 
-type TabId = (typeof TABS)[number]["id"];
+function OverzichtInhoud() {
+  const { isTeamlid } = useAuth();
+  const [filter, setFilter] = useState<string>("alle");
+  const [zoek, setZoek] = useState("");
 
-function VastgoedAI() {
-  const analyze = useServerFn(analyzeProperty);
-  const [analysis, setAnalysis] = useState<PropertyAnalysis | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [stages, setStages] = useState<string[]>([]);
-  const [tab, setTab] = useState<TabId>("overzicht");
-  const [error, setError] = useState<string | null>(null);
-  const [debug, setDebug] = useState<{ logs: string[]; raw: unknown } | null>(null);
+  const lijst = useQuery({
+    queryKey: ["bezichtigingen"],
+    queryFn: lijstBezichtigingen,
+    enabled: isTeamlid === true,
+  });
+  const ids = (lijst.data ?? []).map((b) => b.id);
+  const fotos = useQuery({
+    queryKey: ["omslagfotos", ids.join(",")],
+    queryFn: () => omslagFotos(ids),
+    enabled: ids.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
 
-  const handleAnalyze = async (q: string, pandtype: PandType = "woning") => {
-    setError(null);
-    setDebug(null);
-    setAnalysis(null);
-    const isUrl = /^https?:\/\//i.test(q);
-    const isFundaInBusiness = isUrl && /fundainbusiness\.nl/i.test(q);
-    // Funda in Business = altijd commercieel pand
-    const effectivePandtype: PandType = isFundaInBusiness ? "commercieel" : pandtype;
-    if (isFundaInBusiness) clearCachedInput(q);
-    if (!isUrl) {
-      const cached = findCached(q);
-      if (cached && cached.pandtype === effectivePandtype) {
-        setAnalysis(cached);
-        return;
-      }
-    }
-    setLoading(true);
-    setStages([
-      "Funda ophalen via ScraperAPI…",
-      "PDOK locatie…",
-      "BAG verblijfsobject…",
-      "EP-online energielabel…",
-      "AI-analyse…",
-    ]);
-    try {
-      // 30-daagse cache van marktwaarde per adres → bespaart Altum-credits
-      const mwKey = `vg-mw:${q.toLowerCase().trim()}`;
-      let cachedMarktwaarde: number | undefined;
-      try {
-        const raw = localStorage.getItem(mwKey);
-        if (raw) {
-          const { v, ts } = JSON.parse(raw);
-          if (Date.now() - ts < 30 * 24 * 60 * 60 * 1000 && typeof v === "number" && v > 0) cachedMarktwaarde = v;
-        }
-      } catch { /* ignore */ }
-      const result = (await analyze({
-        data: { query: q, pandtype: effectivePandtype, isUrl, cachedMarktwaarde },
-      })) as PropertyAnalysis;
-      if (isUrl && result.listing?.funda_debug?.blocked) {
-        setError(
-          "ScraperAPI kon de Funda-pagina niet ophalen. Zie debug-output hieronder.",
-        );
-        setDebug({
-          logs: result.listing?.funda_debug?.logs ?? [],
-          raw: result.listing?.funda_debug?.raw_next_data ?? null,
-        });
-        return;
-      }
-      // Persist marktwaarde voor 30 dagen wanneer we een echte AVM-waarde van Altum kregen
-      if (result.altum?.marktwaarde && result.altum?.marktwaarde_source === "altum_avm") {
-        try { localStorage.setItem(mwKey, JSON.stringify({ v: result.altum.marktwaarde, ts: Date.now() })); } catch { /* ignore */ }
-      }
-      saveAnalysis(result);
-      setAnalysis(result);
-      setTab("overzicht");
-    } catch (e: any) {
-      setError(e?.message ?? "Analyse mislukt");
-    } finally {
-      setLoading(false);
-      setStages([]);
-    }
-  };
+  const zichtbaar = useMemo(() => {
+    const q = zoek.trim().toLowerCase();
+    return (lijst.data ?? []).filter(
+      (b) =>
+        (filter === "alle" || b.status === filter) &&
+        (!q || `${b.adres} ${b.woonplaats ?? ""}`.toLowerCase().includes(q)),
+    );
+  }, [lijst.data, filter, zoek]);
+
+  const telling = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const b of lijst.data ?? []) t[b.status] = (t[b.status] ?? 0) + 1;
+    return t;
+  }, [lijst.data]);
 
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground">
-      <Sidebar onAnalyze={handleAnalyze} onSelectHistory={(a) => { setAnalysis(a); setTab("overzicht"); }} loading={loading} loadingStages={stages} current={analysis} />
+    <div className="max-w-6xl mx-auto px-4 pt-6">
+      <PageHeader
+        titel="Bezichtigingen"
+        sub={lijst.data ? `${lijst.data.length} panden bekeken` : undefined}
+        actie={
+          <Link
+            to="/bezichtiging/nieuw"
+            className="hidden md:inline-flex items-center gap-2 bg-navy text-primary-foreground rounded-md px-4 py-2.5 text-sm font-bold shadow-card hover:brightness-110"
+          >
+            <Plus className="size-4" /> Nieuwe bezichtiging
+          </Link>
+        }
+      />
 
-      <main className="flex-1 min-w-0 flex flex-col">
-        {!analysis ? (
-          <EmptyState error={error} debug={debug} loading={loading} onAnalyze={(q) => handleAnalyze(q, "woning")} />
-        ) : (
-          <>
-            <PropertyHeader a={analysis} />
-            <MyEstimate
-              a={analysis}
-              onUpdate={(next) => { saveAnalysis(next); setAnalysis(next); }}
-            />
-            <KpiStrip a={analysis} />
-            <Warnings a={analysis} />
-            <div className="px-6 border-b border-border bg-card">
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={zoek}
+            onChange={(e) => setZoek(e.target.value)}
+            placeholder="Zoek op adres of plaats"
+            className="w-full bg-card rounded-md pl-9 pr-3 py-2.5 text-sm border border-border"
+          />
+        </div>
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 -mx-4 px-4">
+        <FilterKnop actief={filter === "alle"} onClick={() => setFilter("alle")}>
+          Alle {lijst.data ? `(${lijst.data.length})` : ""}
+        </FilterKnop>
+        {STATUSSEN.map((s) => (
+          <FilterKnop key={s.id} actief={filter === s.id} onClick={() => setFilter(s.id)}>
+            {s.label} {telling[s.id] ? `(${telling[s.id]})` : ""}
+          </FilterKnop>
+        ))}
+      </div>
 
-              <div className="flex gap-1 overflow-x-auto">
-                {TABS.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTab(t.id)}
-                    className={`px-4 py-3 text-sm border-b-2 transition whitespace-nowrap uppercase tracking-wider text-[12px] font-semibold ${
-                      tab === t.id
-                        ? "border-primary text-navy"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="p-6 flex-1 bg-background">
-              {tab === "overzicht" && <OverviewTab a={analysis} />}
-              {tab === "kadaster" && <KadasterTab a={analysis} onUpdate={(next) => { saveAnalysis(next); setAnalysis(next); }} />}
-              {tab === "potentieel" && <PotentialTab a={analysis} />}
-              {tab === "aankoop" && <PurchaseTab a={analysis} />}
-              {tab === "renovatie" && <RenovationTab a={analysis} />}
-              {tab === "exit" && <ExitTab a={analysis} />}
-            </div>
-          </>
-        )}
-      </main>
+      {lijst.isLoading || isTeamlid === null ? (
+        <div className="py-20 flex justify-center text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" />
+        </div>
+      ) : lijst.error ? (
+        <p className="text-sm text-destructive">Laden mislukt: {(lijst.error as Error).message}</p>
+      ) : !lijst.data?.length ? (
+        <LegeStaat />
+      ) : !zichtbaar.length ? (
+        <p className="text-sm text-muted-foreground py-10 text-center">Geen bezichtigingen met dit filter.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {zichtbaar.map((b) => {
+            const ppm = prijsPerM2(b);
+            const foto = fotos.data?.[b.id];
+            return (
+              <Link
+                key={b.id}
+                to="/bezichtiging/$id"
+                params={{ id: b.id }}
+                className="panel overflow-hidden lift block"
+              >
+                <div className="aspect-[16/10] bg-muted relative">
+                  {foto ? (
+                    <img src={foto} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/50">
+                      <ImageOff className="size-7" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2">
+                    <StatusBadge status={b.status} />
+                  </div>
+                  {b.energielabel && (
+                    <div className="absolute top-2 right-2">
+                      <EnergieLabel label={b.energielabel} />
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <div className="font-semibold text-foreground truncate">{b.adres}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {datumKort(b.datum)}
+                    {b.woonplaats ? ` · ${b.woonplaats}` : ""}
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-sm tabular">
+                    <Kengetal label="Vraagprijs" waarde={eur(b.vraagprijs)} />
+                    <Kengetal label="Woonopp." waarde={getal(b.woonoppervlakte_m2, " m²")} />
+                    <Kengetal label="Per m²" waarde={ppm ? eur(ppm) : "—"} />
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      <Link
+        to="/bezichtiging/nieuw"
+        className="md:hidden fixed right-4 bottom-20 z-30 size-14 rounded-full bg-navy text-primary-foreground shadow-elevated flex items-center justify-center"
+        aria-label="Nieuwe bezichtiging"
+      >
+        <Plus className="size-6" />
+      </Link>
     </div>
   );
 }
 
-function EmptyState({ error, debug, loading, onAnalyze }: { error: string | null; debug: { logs: string[]; raw: unknown } | null; loading: boolean; onAnalyze: (q: string) => void }) {
-  const [q, setQ] = useState("");
-  const submit = () => { if (q.trim() && !loading) onAnalyze(q.trim()); };
+function FilterKnop({ actief, onClick, children }: { actief: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-      <img
-        src={heroImage}
-        alt="Klassieke Amsterdamse grachtenpanden tijdens het gouden uur"
-        width={1920}
-        height={1080}
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-      <div className="absolute inset-0 bg-white/40" />
-      <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-white/60" />
+    <button
+      onClick={onClick}
+      className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+        actief ? "bg-navy text-primary-foreground border-transparent" : "bg-card text-muted-foreground border-border hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
-      <div className="relative w-full max-w-2xl mx-6 panel shadow-elevated p-8 md:p-10">
-        <div className="label-eyebrow mb-3 text-center">Nederlandse Vastgoed Investment Terminal</div>
-        <h1 className="display text-3xl md:text-4xl font-extrabold tracking-tight text-navy text-center leading-tight">
-          Analyseer elk vastgoedobject in seconden
-        </h1>
-        <p className="text-sm md:text-[15px] text-muted-foreground mt-3 text-center max-w-lg mx-auto leading-relaxed">
-          Plak een Funda-URL of voer een Nederlands adres in en krijg direct marktwaarde,
-          maximaal bod, risicoprofiel en rendement.
-        </p>
+function Kengetal({ label, waarde }: { label: string; waarde: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-semibold truncate">{waarde}</div>
+    </div>
+  );
+}
 
-        <div className="mt-7 flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
-              placeholder="https://www.funda.nl/...  ·  Damrak 1, Amsterdam"
-              className="w-full bg-muted text-foreground placeholder:text-muted-foreground/70 rounded-md pl-10 pr-3 py-3 text-sm border border-border"
-            />
-          </div>
-          <button
-            onClick={submit}
-            disabled={loading || !q.trim()}
-            className="inline-flex items-center justify-center gap-2 bg-navy disabled:opacity-50 text-primary-foreground rounded-md px-6 py-3 text-sm font-bold tracking-wide shadow-card hover:shadow-elevated hover:brightness-110 active:scale-[0.99] transition"
-          >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-            {loading ? "Analyseren…" : "Analyseer"}
-          </button>
-        </div>
-
-        {error && (
-          <p className="mt-4 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-3 text-center">{error}</p>
-        )}
-        {debug && (
-          <div className="mt-4 text-xs bg-muted border border-border rounded-md p-3 max-h-96 overflow-auto text-left font-mono">
-            <div className="font-bold mb-2">ScraperAPI debug</div>
-            {debug.logs.map((l, i) => (
-              <div key={i} className="whitespace-pre-wrap break-all">{l}</div>
-            ))}
-            {debug.raw != null && (
-              <pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(debug.raw, null, 2)}</pre>
-            )}
-          </div>
-        )}
-
-        <div className="mt-8 grid grid-cols-3 gap-3 text-[11px]">
-          {[
-            { k: "ScraperAPI · Funda", v: "Automatische scraping" },
-            { k: "PDOK · BAG · RCE", v: "Officiële databronnen" },
-            { k: "Lovable AI Gateway", v: "Real-time analyse" },
-          ].map((c) => (
-            <div key={c.k} className="rounded-md border border-border bg-background/80 backdrop-blur p-3 text-left">
-              <div className="label-eyebrow">{c.k}</div>
-              <div className="text-foreground mt-1 font-medium">{c.v}</div>
-            </div>
-          ))}
-        </div>
+function LegeStaat() {
+  return (
+    <div className="panel p-10 text-center max-w-lg mx-auto mt-6">
+      <div className="size-12 rounded-full bg-muted mx-auto flex items-center justify-center mb-3">
+        <Camera className="size-5 text-navy" />
       </div>
+      <h2 className="font-bold text-navy">Nog geen bezichtigingen</h2>
+      <p className="text-sm text-muted-foreground mt-1.5">
+        Typ een adres of plak een Funda-link. De gegevens uit het Kadaster, de WOZ-waarde en het
+        energielabel worden automatisch opgehaald. Daarna voeg je foto's en notities toe.
+      </p>
+      <Link
+        to="/bezichtiging/nieuw"
+        className="mt-5 inline-flex items-center gap-2 bg-navy text-primary-foreground rounded-md px-4 py-2.5 text-sm font-bold"
+      >
+        <Plus className="size-4" /> Eerste bezichtiging
+      </Link>
     </div>
   );
 }
