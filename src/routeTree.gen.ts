@@ -9,15 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AnalyseRouteImport } from './routes/analyse'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BezichtigingNieuwRouteImport } from './routes/bezichtiging.nieuw'
+import { Route as AnalyseRouteImport } from './routes/analyse'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as BezichtigingIdRouteImport } from './routes/bezichtiging.$id'
+import { Route as BezichtigingNieuwRouteImport } from './routes/bezichtiging.nieuw'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnalyseRoute = AnalyseRouteImport.update({
@@ -25,19 +25,19 @@ const AnalyseRoute = AnalyseRouteImport.update({
   path: '/analyse',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BezichtigingNieuwRoute = BezichtigingNieuwRouteImport.update({
-  id: '/bezichtiging/nieuw',
-  path: '/bezichtiging/nieuw',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BezichtigingIdRoute = BezichtigingIdRouteImport.update({
   id: '/bezichtiging/$id',
   path: '/bezichtiging/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BezichtigingNieuwRoute = BezichtigingNieuwRouteImport.update({
+  id: '/bezichtiging/nieuw',
+  path: '/bezichtiging/nieuw',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -66,11 +66,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/analyse'
-    | '/login'
-    | '/bezichtiging/$id'
-    | '/bezichtiging/nieuw'
+    '/' | '/analyse' | '/login' | '/bezichtiging/$id' | '/bezichtiging/nieuw'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/analyse' | '/login' | '/bezichtiging/$id' | '/bezichtiging/nieuw'
   id:
@@ -92,11 +88,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analyse': {
@@ -106,18 +102,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnalyseRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bezichtiging/nieuw': {
-      id: '/bezichtiging/nieuw'
-      path: '/bezichtiging/nieuw'
-      fullPath: '/bezichtiging/nieuw'
-      preLoaderRoute: typeof BezichtigingNieuwRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bezichtiging/$id': {
@@ -125,6 +114,13 @@ declare module '@tanstack/react-router' {
       path: '/bezichtiging/$id'
       fullPath: '/bezichtiging/$id'
       preLoaderRoute: typeof BezichtigingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bezichtiging/nieuw': {
+      id: '/bezichtiging/nieuw'
+      path: '/bezichtiging/nieuw'
+      fullPath: '/bezichtiging/nieuw'
+      preLoaderRoute: typeof BezichtigingNieuwRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
