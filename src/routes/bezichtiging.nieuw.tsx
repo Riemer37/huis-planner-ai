@@ -8,6 +8,7 @@ import { BezichtigingVelden, PandVelden } from "@/components/bezichtiging/Velden
 import { prefillPand } from "@/lib/prefill.functions";
 import { maakBezichtiging } from "@/lib/bezichtigingen";
 import { useConcept } from "@/lib/useConcept";
+import { AdresZoeker } from "@/components/bezichtiging/AdresZoeker";
 import type { BezichtigingInsert } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/bezichtiging/nieuw")({
@@ -35,12 +36,12 @@ function Nieuw() {
   const [fout, setFout] = useState<string | null>(null);
   const { concept, zet, reset } = useConcept({ datum: vandaag(), status: "bezocht", pandtype: "woning", bronnen: {} });
 
-  const ophalen = async () => {
-    if (zoek.trim().length < 3) return;
+  const ophalen = async (tekst = zoek) => {
+    if (tekst.trim().length < 3 || laden) return;
     setLaden(true);
     setFout(null);
     try {
-      const r = await prefill({ data: { query: zoek.trim() } });
+      const r = await prefill({ data: { query: tekst.trim() } });
       const { meldingen: m, bronnen, ...velden } = r;
       reset({ ...concept, ...velden, bronnen });
       setMeldingen(m);
@@ -85,28 +86,20 @@ function Nieuw() {
 
       {stap === "zoeken" ? (
         <div className="panel p-5 space-y-4">
-          <label className="block">
+          <div className="block">
             <span className="label-eyebrow">Adres of Funda-link</span>
-            <div className="relative mt-1">
-              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                autoFocus
-                value={zoek}
-                onChange={(e) => setZoek(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && ophalen()}
-                placeholder="Hoogstraat 12, Maassluis  ·  https://www.funda.nl/…"
-                className="w-full bg-muted rounded-md pl-9 pr-3 py-3 text-sm border border-border"
-              />
+            <div className="mt-1">
+              <AdresZoeker waarde={zoek} onChange={setZoek} onKies={(v) => ophalen(v)} autoFocus />
             </div>
-          </label>
+          </div>
           <p className="text-xs text-muted-foreground">
-            We halen automatisch op: m² en gebruiksdoel (BAG), bouwjaar, energielabel (EP-online), WOZ-waarde en
+            Kies een adres uit de lijst; je hoeft de plaats er niet bij te typen. We halen automatisch op: m² en gebruiksdoel (BAG), bouwjaar, energielabel (EP-online), WOZ-waarde en
             monumentstatus. Met een Funda-link ook de vraagprijs.
           </p>
           {fout && <p className="text-sm text-destructive">{fout}</p>}
           <div className="flex flex-col sm:flex-row gap-2">
             <button
-              onClick={ophalen}
+              onClick={() => ophalen()}
               disabled={laden || zoek.trim().length < 3}
               className="inline-flex items-center justify-center gap-2 bg-navy text-primary-foreground rounded-md px-5 py-3 text-sm font-bold disabled:opacity-50"
             >
