@@ -17,7 +17,7 @@ export const Route = createFileRoute("/bezichtiging/nieuw")({
       <Nieuw />
     </AppShell>
   ),
-  head: () => ({ meta: [{ title: "Nieuwe bezichtiging — VastgoedAI" }] }),
+  head: () => ({ meta: [{ title: "VastgoedAI · Nieuwe bezichtiging" }] }),
 });
 
 function vandaag() {

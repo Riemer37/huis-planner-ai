@@ -41,7 +41,7 @@ export const Route = createFileRoute("/bezichtiging/$id")({
       <Detail />
     </AppShell>
   ),
-  head: () => ({ meta: [{ title: "Bezichtiging — VastgoedAI" }] }),
+  head: () => ({ meta: [{ title: "VastgoedAI · Bezichtiging" }] }),
 });
 
 function Detail() {
@@ -62,7 +62,7 @@ function Detail() {
 
   // Adres in de tabtitel, zodat je tabbladen en bladwijzers herkent
   useEffect(() => {
-    if (q.data?.adres) document.title = `${q.data.adres.split(",")[0]} — VastgoedAI`;
+    if (q.data?.adres) document.title = `VastgoedAI · ${q.data.adres.split(",")[0]}`;
   }, [q.data?.adres]);
 
   const zetTab = (t: TabId) => navigate({ to: ".", search: { tab: t }, replace: true });

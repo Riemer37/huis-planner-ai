@@ -24,7 +24,7 @@ export const Route = createFileRoute("/analyse")({
   component: VastgoedAI,
   head: () => ({
     meta: [
-      { title: "Snelle analyse — VastgoedAI" },
+      { title: "VastgoedAI · Snelle analyse" },
       { name: "description", content: "Nederlandse vastgoed-beleggingstool: aankoopadvies, max bod, risico's en rendement." },
     ],
   }),
