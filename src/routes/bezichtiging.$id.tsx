@@ -60,6 +60,11 @@ function Detail() {
     if (q.data && !gewijzigd) reset(q.data);
   }, [q.data]);
 
+  // Adres in de tabtitel, zodat je tabbladen en bladwijzers herkent
+  useEffect(() => {
+    if (q.data?.adres) document.title = `${q.data.adres.split(",")[0]} — VastgoedAI`;
+  }, [q.data?.adres]);
+
   const zetTab = (t: TabId) => navigate({ to: ".", search: { tab: t }, replace: true });
 
   const bijwerken = (b: Bezichtiging) => {
