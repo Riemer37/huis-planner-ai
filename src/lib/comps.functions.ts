@@ -62,7 +62,11 @@ function num(v: unknown): number | undefined {
 export const getComparables = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
-  .handler(async ({ data }): Promise<CompsResult> => {
+  .handler(({ data }) => haalAltumReferenties(data.postcode, data.huisnummer));
+
+/** Verkochte woningen in de buurt via Altum AI (server-side). */
+export async function haalAltumReferenties(postcode: string, huisnummer: string): Promise<CompsResult> {
+    const data = { postcode, huisnummer };
     const key = process.env.ALTUM_AI_API_KEY;
     if (!key) return { status: "error", message: "ALTUM_AI_API_KEY ontbreekt" };
     const pc = data.postcode.replace(/\s+/g, "").toUpperCase();
@@ -129,4 +133,4 @@ export const getComparables = createServerFn({ method: "POST" })
       console.log("[ALTUM/REFERENCE] error:", (e as Error).message);
       return { status: "error", message: (e as Error).message };
     }
-  });
+  }

@@ -45,6 +45,7 @@ export const BRON_LABELS: Record<string, string> = {
   woz_loket: "WOZ-loket",
   pdok: "PDOK",
   rce: "RCE",
+  kadaster: "Kadaster",
   handmatig: "Handmatig",
 };
 

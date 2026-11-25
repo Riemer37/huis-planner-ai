@@ -2,7 +2,7 @@ import type { Listing, JsonValue } from "./types";
 
 // Helpers used only on server
 export async function fetchPdok(query: string) {
-  const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(query)}&fl=id,weergavenaam,centroide_ll,woonplaatsnaam,gemeentenaam,buurtnaam,postcode,straatnaam,huisnummer,adresseerbaarobject_id,nummeraanduiding_id&rows=1`;
+  const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(query)}&fl=id,weergavenaam,centroide_ll,woonplaatsnaam,gemeentenaam,buurtnaam,buurtcode,postcode,straatnaam,huisnummer,adresseerbaarobject_id,nummeraanduiding_id&rows=1`;
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) throw new Error(`PDOK ${r.status}`);
   const j: any = await r.json();
@@ -16,6 +16,7 @@ export async function fetchPdok(query: string) {
     postcode: doc.postcode,
     woonplaats: doc.woonplaatsnaam,
     buurt: doc.buurtnaam,
+    buurtcode: doc.buurtcode as string | undefined,
     gemeente: doc.gemeentenaam,
     lon: ll ? parseFloat(ll[1]) : undefined,
     lat: ll ? parseFloat(ll[2]) : undefined,

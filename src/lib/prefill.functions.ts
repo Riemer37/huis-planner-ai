@@ -19,6 +19,7 @@ export interface PrefillData {
   woonplaats?: string;
   gemeente?: string;
   buurt?: string;
+  buurtcode?: string;
   lat?: number;
   lon?: number;
   bag_id?: string;
@@ -96,6 +97,7 @@ export const prefillPand = createServerFn({ method: "POST" })
       woonplaats: pdok.woonplaats,
       gemeente: pdok.gemeente,
       buurt: pdok.buurt,
+      buurtcode: pdok.buurtcode,
       lat: pdok.lat,
       lon: pdok.lon,
       bag_id: pdok.bagId,

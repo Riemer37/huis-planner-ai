@@ -11,6 +11,9 @@ type BezichtigingRow = {
   bouwjaar: number | null;
   bronnen: Json;
   buurt: string | null;
+  buurt_at: string | null;
+  buurt_data: Json | null;
+  buurtcode: string | null;
   created_at: string;
   created_by: string | null;
   datum: string | null;

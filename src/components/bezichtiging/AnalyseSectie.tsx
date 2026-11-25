@@ -31,6 +31,19 @@ const STAAT_NAAR_AI: Record<string, string> = {
   sloop: "slecht",
 };
 
+function buurtSamenvatting(b: Bezichtiging) {
+  const d = b.buurt_data as any;
+  if (!d) return null;
+  const delen: string[] = [];
+  const ppm = (d.verkopen ?? []).map((v: any) => v.prijs_per_m2).filter(Boolean);
+  if (ppm.length)
+    delen.push(`Recente verkopen in de buurt: gemiddeld €${Math.round(ppm.reduce((a: number, c: number) => a + c, 0) / ppm.length)}/m² (${ppm.length} transacties)`);
+  if (d.woz_buren_mediaan_m2) delen.push(`Mediaan WOZ/m² van de buren: €${d.woz_buren_mediaan_m2}`);
+  if (d.cijfers?.gemiddelde_woz) delen.push(`Gemiddelde WOZ buurt (CBS): €${d.cijfers.gemiddelde_woz}`);
+  if (d.perceel?.grootte_m2) delen.push(`Kadastrale perceelgrootte: ${d.perceel.grootte_m2} m²`);
+  return delen.length ? delen.join(". ") : null;
+}
+
 export function AnalyseSectie({ b, opslaan }: { b: Bezichtiging; opslaan: (a: PropertyAnalysis) => Promise<void> }) {
   const analyze = useServerFn(analyzeProperty);
   const [bezig, setBezig] = useState(false);
@@ -49,6 +62,7 @@ export function AnalyseSectie({ b, opslaan }: { b: Bezichtiging; opslaan: (a: Pr
         b.notities && `Notities bezichtiging: ${b.notities}`,
         b.renovatie_schatting && `Eigen schatting renovatie/sloop: €${b.renovatie_schatting}`,
         b.staat === "sloop" && "Plan: slopen en herbouwen",
+        buurtSamenvatting(b),
       ]
         .filter(Boolean)
         .join(". ");
